@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Guardian Link</string>
+    <string name="notification_channel_name">Child protection</string>
+</resources>
