@@ -130,7 +130,16 @@ class ParentApi(private val session: ParentSession) {
     fun latestLocation(deviceId: String): LocationRecord? {
         val rows = get("/rest/v1/device_locations?device_id=eq.$deviceId&select=latitude,longitude,accuracy_meters,recorded_at&order=recorded_at.desc&limit=1") ?: return null
         if (rows.length() == 0) return null
-        val row = rows.getJSONObject(0)
+        return locationRecord(rows.getJSONObject(0))
+    }
+
+    /** Kept out of the main dashboard; callers display this only in the dedicated Location Log. */
+    fun locationHistory(deviceId: String, limit: Int = 30): List<LocationRecord> =
+        get("/rest/v1/device_locations?device_id=eq.$deviceId&select=latitude,longitude,accuracy_meters,recorded_at&order=recorded_at.desc&limit=${limit.coerceIn(1, 100)}")?.let { rows ->
+            (0 until rows.length()).map { locationRecord(rows.getJSONObject(it)) }
+        } ?: emptyList()
+
+    private fun locationRecord(row: JSONObject): LocationRecord {
         val accuracy = row.optDouble("accuracy_meters", Double.NaN)
         return LocationRecord(row.getDouble("latitude"), row.getDouble("longitude"), accuracy.takeIf { !it.isNaN() }?.toFloat(), row.getString("recorded_at"))
     }

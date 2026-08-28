@@ -17,6 +17,8 @@
         <activity android:name=".ui.BlockingActivity" android:excludeFromRecents="true" android:exported="false" />
         <activity android:name=".ui.ActivityTimelineActivity" android:exported="false" />
         <activity android:name=".ui.ManageAppsActivity" android:exported="false" />
+        <activity android:name=".ui.LocationLogActivity" android:exported="false" />
+        <activity android:name=".ui.GuestPreviewActivity" android:exported="false" />
         <activity android:name=".ui.SosAlertActivity" android:exported="false" />
         <activity android:name=".ui.LiveLocationActivity" android:exported="false" />
         <activity android:name=".ui.SafeBrowserActivity" android:exported="false" />

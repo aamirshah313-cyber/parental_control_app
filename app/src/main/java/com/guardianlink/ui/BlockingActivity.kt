@@ -11,11 +11,15 @@ import android.widget.TextView
 class BlockingActivity : android.app.Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(48, 48, 48, 48) }
-        root.addView(TextView(this).apply { text = "This app is unavailable\n${intent.getStringExtra(EXTRA_REASON)}"; textSize = 24f; gravity = Gravity.CENTER })
-        root.addView(Button(this).apply { text = "Go to home screen"; setOnClickListener { finishAndRemoveTask() } })
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(28), dp(28), dp(28), dp(28)) }
+        root.addView(TextView(this).apply { text = "PAUSE ACTIVE"; textSize = 12f; letterSpacing = .12f; gravity = Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD })
+        root.addView(TextView(this).apply { text = "This app is unavailable"; textSize = 26f; gravity = Gravity.CENTER; typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(8), 0, dp(8)) })
+        root.addView(TextView(this).apply { text = intent.getStringExtra(EXTRA_REASON) ?: "A parent rule is currently active."; textSize = 16f; gravity = Gravity.CENTER; setPadding(dp(16), 0, dp(16), dp(24)) })
+        root.addView(Button(this).apply { text = "Go to home screen"; isAllCaps = false; minHeight = dp(48); setOnClickListener { finishAndRemoveTask() } })
         setContentView(root)
     }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val EXTRA_REASON = "reason"

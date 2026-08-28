@@ -30,9 +30,11 @@ class SosAlertActivity : android.app.Activity() {
         super.onCreate(savedInstanceState)
         val message = intent.getStringExtra(EXTRA_MESSAGE) ?: "A child pressed the SOS button."
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(28), dp(28), dp(28), dp(28)) }
-        root.addView(TextView(this).apply { text = "SOS ALERT"; textSize = 36f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD })
-        root.addView(TextView(this).apply { text = "$message\n\nContact your child now."; textSize = 20f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); setPadding(0, dp(24), 0, dp(24)) })
-        root.addView(Button(this).apply { text = "Stop SOS alarm"; isAllCaps = false; setOnClickListener { SosAlertService.stopAlarm(this@SosAlertActivity); finish() } })
+        root.addView(TextView(this).apply { text = "EMERGENCY ALERT"; textSize = 13f; gravity = Gravity.CENTER; setTextColor(0xFFFFD5DB.toInt()); typeface = android.graphics.Typeface.DEFAULT_BOLD; letterSpacing = .12f })
+        root.addView(TextView(this).apply { text = "SOS"; textSize = 42f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(8), 0, 0) })
+        root.addView(TextView(this).apply { text = message; textSize = 21f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(22), 0, dp(6)) })
+        root.addView(TextView(this).apply { text = "Contact your child now. The alarm stays active until you stop it."; textSize = 15f; gravity = Gravity.CENTER; setTextColor(0xFFFFE8EB.toInt()); setPadding(dp(12), 0, dp(12), dp(24)) })
+        root.addView(Button(this).apply { text = "I’ve seen this — stop alarm"; isAllCaps = false; setTextColor(0xFF9E1830.toInt()); setBackgroundColor(Color.WHITE); minHeight = dp(52); setOnClickListener { SosAlertService.stopAlarm(this@SosAlertActivity); finish() } })
         setContentView(root)
         handler.post(blink)
         voice = TextToSpeech(this) { result ->

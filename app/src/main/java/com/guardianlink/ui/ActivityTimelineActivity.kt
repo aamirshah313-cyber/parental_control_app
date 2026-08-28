@@ -32,9 +32,10 @@ class ActivityTimelineActivity : android.app.Activity() {
         val session = ParentSessionStore(this).load() ?: run { state.text = "Sign in again to view activity."; return }
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
         Thread {
-            val events = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).recentEvents(deviceId)
+            // Location check-ins have their own focused log. This timeline stays about actionable safety events.
+            val events = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).recentEvents(deviceId).filterNot { it.eventType == "location_update" }
             runOnUiThread {
-                if (events.isEmpty()) state.text = "No safety events recorded yet."
+                if (events.isEmpty()) state.text = "No safety events recorded yet. Location check-ins are available from Location log."
                 else {
                     state.text = "Latest ${events.size} event${if (events.size == 1) "" else "s"}"
                     events.forEach { content.addView(eventCard(it)) }

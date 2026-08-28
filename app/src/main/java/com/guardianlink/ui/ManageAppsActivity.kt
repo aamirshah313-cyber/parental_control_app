@@ -27,8 +27,9 @@ class ManageAppsActivity : android.app.Activity() {
         super.onCreate(savedInstanceState)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(Color.rgb(246, 248, 252)) }
         setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(content) })
-        content.addView(TextView(this).apply { text = "Manage child apps"; textSize = 25f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
-        content.addView(TextView(this).apply { text = "Select one or more reported apps, then block, allow, or include them in a managed pause. New apps awaiting approval are marked below."; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(8), 0, dp(10)) })
+        content.addView(TextView(this).apply { text = "APP CONTROLS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(19, 102, 214)) })
+        content.addView(TextView(this).apply { text = "Manage child apps"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(5), 0, dp(4)) })
+        content.addView(TextView(this).apply { text = "Select apps, then use a focused action below. Apps awaiting approval are called out clearly."; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(10)) })
         status = TextView(this).apply { text = "Loading reported apps…"; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(Color.rgb(232, 242, 255)) }
         content.addView(status)
         load()
@@ -64,14 +65,23 @@ class ManageAppsActivity : android.app.Activity() {
                 app.packageName in policy.managedPackages -> "Managed"
                 else -> "Allowed"
             }
-            val box = CheckBox(this).apply { text = "${app.displayName} — $state\n${app.packageName}"; setPadding(0, dp(6), 0, dp(6)) }
+            val box = CheckBox(this).apply {
+                text = "${app.displayName} — $state\n${app.packageName}"
+                textSize = 14f; setTextColor(Color.rgb(35, 50, 70)); setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) }
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(5), 0, dp(2)) }
+            }
             selected[app.packageName] = box
             content.addView(box)
         }
-        content.addView(primaryButton("Block selected apps") { updatePolicy { it.copy(blockedPackages = it.blockedPackages + chosen(), approvedPackages = it.approvedPackages - chosen()) } })
-        content.addView(primaryButton("Allow / unblock selected apps") { updatePolicy { it.copy(blockedPackages = it.blockedPackages - chosen(), approvedPackages = it.approvedPackages + chosen()) } })
-        content.addView(primaryButton("Add selected to managed pause") { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } })
-        content.addView(primaryButton("Remove selected from managed pause") { updatePolicy { it.copy(managedPackages = it.managedPackages - chosen()) } })
+        content.addView(actionRow(
+            "Block selected" to { updatePolicy { it.copy(blockedPackages = it.blockedPackages + chosen(), approvedPackages = it.approvedPackages - chosen()) } },
+            "Allow selected" to { updatePolicy { it.copy(blockedPackages = it.blockedPackages - chosen(), approvedPackages = it.approvedPackages + chosen()) } }
+        ))
+        content.addView(actionRow(
+            "Add to pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } },
+            "Remove from pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages - chosen()) } }
+        ))
     }
 
     private fun chosen(): Set<String> = selected.filterValues { it.isChecked }.keys
@@ -93,6 +103,13 @@ class ManageAppsActivity : android.app.Activity() {
     }
 
     private fun primaryButton(label: String, action: () -> Unit) = Button(this).apply { text = label; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)); minHeight = dp(48); setOnClickListener { action() } }
+    private fun actionRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
+        addView(compactButton(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) })
+        addView(compactButton(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) })
+    }
+    private fun compactButton(label: String, action: () -> Unit) = Button(this).apply { text = label; textSize = 13f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) }; setOnClickListener { action() } }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {

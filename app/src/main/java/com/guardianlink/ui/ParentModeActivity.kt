@@ -68,14 +68,16 @@ class ParentModeActivity : android.app.Activity() {
 
     private fun buildSignIn() {
         content.removeAllViews()
-        content.addView(title("Parent dashboard"))
-        content.addView(note("Sign in or create a parent account. Each parent account can access only its own family data."))
-        content.addView(button("Read privacy and child-data notice") { showPrivacyNotice() })
+        content.addView(eyebrow("PARENT PORTAL"))
+        content.addView(title("Your family, at a glance"))
+        content.addView(note("Sign in to your private dashboard. New parents can create an account in under a minute."))
+        content.addView(secondaryButton("Read privacy and child-data notice") { showPrivacyNotice() })
         val email = field("Parent email", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         val password = field("Password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         val guardianConsent = CheckBox(this).apply {
             text = "I confirm that I am the parent or legal guardian authorized to supervise this child device."
         }
+        content.addView(section("Account details"))
         content.addView(email); content.addView(password)
         content.addView(guardianConsent)
         content.addView(button("Sign in") {
@@ -122,35 +124,15 @@ class ParentModeActivity : android.app.Activity() {
             .show()
     }
 
-    private fun buildDashboard(devices: List<DeviceRecord>) {
-        content.removeAllViews()
-        content.addView(title("${getString(R.string.app_name)} — Parent"))
-        val activeFamily = family
-        if (activeFamily == null) {
-            content.addView(note("No family was found for this account. Create one before pairing a child phone."))
-            val name = field("Family name").apply { setText("My family") }
-            content.addView(name)
-            content.addView(button("Create family") { createFamily(name.text.toString()) })
-            content.addView(button("Sign out") { signOut() })
-            addStatus()
-            return
-        }
-        // Start while this activity is visible; Android permits the foreground receiver to continue afterward.
-        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
-        content.addView(note("Family: ${activeFamily.name}"))
-        content.addView(button("Refresh devices") { refreshFamily() })
-        content.addView(button("Enable parent SOS and app-request alerts") { enableParentAlerts() })
-        content.addView(button("Enable SOS receiver") { startForegroundService(android.content.Intent(this, SosAlertService::class.java)); setStatus("SOS receiver enabled. It checks for alerts every 5 seconds.") })
-        content.addView(button("Stop SOS alarm / receiver") { SosAlertService.stopAlarm(this); setStatus("SOS receiver stopped.") })
-        content.addView(button("Sign out") { signOut() })
-
-        content.addView(section("Pair a child phone"))
-        val childName = field("Child/device name").apply { setText("Child phone") }
+    private fun showPairingDialog() {
+        val dialogContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
+        val childName = field("Child or device name").apply { setText("Child phone") }
         val durations = listOf("10 minutes" to 600, "30 minutes" to 1_800, "1 hour" to 3_600, "24 hours" to 86_400)
         val durationPicker = Spinner(this).apply { adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, durations.map { it.first }) }
-        content.addView(childName); content.addView(durationPicker)
-        val pairingCodeOutput = TextView(this).apply { text = lastPairingMessage.orEmpty() }
-        val copyPairingCode = button("Copy pairing code") {
+        val output = TextView(this).apply {
+            text = lastPairingMessage.orEmpty(); textSize = 14f; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244))
+        }
+        val copy = button("Copy pairing code") {
             val code = lastPairingCode
             if (code == null) setStatus("Generate a pairing code first.")
             else {
@@ -158,30 +140,109 @@ class ParentModeActivity : android.app.Activity() {
                 setStatus("Pairing code copied. Paste it on the child phone.")
             }
         }.apply { isEnabled = lastPairingCode != null }
-        content.addView(button("Generate one-time pairing code") {
-            createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, pairingCodeOutput, copyPairingCode)
-        })
-        content.addView(pairingCodeOutput)
-        content.addView(copyPairingCode)
+        dialogContent.addView(note("Create a single-use code, then paste it into Step 1 on the child device."))
+        dialogContent.addView(childName)
+        dialogContent.addView(durationPicker)
+        dialogContent.addView(button("Generate one-time code") { createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, output, copy) })
+        dialogContent.addView(output)
+        dialogContent.addView(copy)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Pair a child device")
+            .setView(dialogContent)
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showAlertControls() {
+        val dialogContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
+        dialogContent.addView(note("Keep parent alerts enabled to hear SOS alerts and app-approval requests. Android may ask for notification permission."))
+        dialogContent.addView(button("Enable parent alerts") { enableParentAlerts() })
+        dialogContent.addView(secondaryButton("Stop current SOS alarm") { SosAlertService.stopAlarm(this); setStatus("SOS alarm stopped.") })
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Parent alerts")
+            .setView(dialogContent)
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun summaryCard(familyName: String, deviceCount: Int) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(18), dp(16), dp(18), dp(16))
+        background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244))
+        layoutParams = layoutParams(0, 10)
+        addView(TextView(this@ParentModeActivity).apply { text = familyName; textSize = 20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
+        addView(TextView(this@ParentModeActivity).apply { text = "$deviceCount child device${if (deviceCount == 1) "" else "s"} linked • Choose a device to manage its protection."; textSize = 14f; setTextColor(Color.rgb(50, 78, 116)); setPadding(0, dp(4), 0, 0) })
+    }
+
+    private fun deviceCard(name: String, lastSeen: String, selected: Boolean, action: () -> Unit) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        background = rounded(if (selected) Color.rgb(232, 242, 255) else Color.WHITE, if (selected) Color.rgb(171, 204, 244) else Color.rgb(224, 229, 238))
+        layoutParams = layoutParams(0, 8)
+        addView(TextView(this@ParentModeActivity).apply { text = name; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
+        addView(TextView(this@ParentModeActivity).apply { text = "Last device check-in: $lastSeen"; textSize = 13f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(3), 0, dp(10)) })
+        addView(secondaryButton(if (selected) "Managing this device" else "Open controls", action).apply { isEnabled = !selected })
+    }
+
+    private fun actionRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = layoutParams(0, 6)
+        addView(compactAction(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) })
+        addView(compactAction(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) })
+    }
+
+    private fun compactAction(label: String, action: () -> Unit) = Button(this).apply {
+        text = label; textSize = 13f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = rounded(Color.WHITE, Color.rgb(171, 204, 244)); setOnClickListener { action() }
+    }
+
+    private fun buildDashboard(devices: List<DeviceRecord>) {
+        content.removeAllViews()
+        content.addView(eyebrow("FAMILY DASHBOARD"))
+        content.addView(title("${getString(R.string.app_name)}"))
+        val activeFamily = family
+        if (activeFamily == null) {
+            content.addView(note("Start by naming your family. You can then create a private pairing code for each child device."))
+            val name = field("Family name").apply { setText("My family") }
+            content.addView(name)
+            content.addView(button("Create family") { createFamily(name.text.toString()) })
+            content.addView(secondaryButton("Sign out") { signOut() })
+            addStatus()
+            return
+        }
+        // Start while this activity is visible; Android permits the foreground receiver to continue afterward.
+        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
+        content.addView(summaryCard(activeFamily.name, devices.size))
+        content.addView(actionRow(
+            "Pair a child" to { showPairingDialog() },
+            "Alerts" to { showAlertControls() }
+        ))
+        content.addView(secondaryButton("Refresh dashboard") { refreshFamily() })
 
         content.addView(section("Child devices"))
-        if (devices.isEmpty()) content.addView(note("No child device paired yet."))
+        if (devices.isEmpty()) content.addView(note("No child device paired yet. Use “Pair a child” to create a one-time code."))
         devices.forEach { device ->
             val seen = device.lastSeenAt?.replace('T', ' ')?.substringBefore('.') ?: "not yet reported"
-            content.addView(button("${device.displayName} — last seen: $seen") { selectDevice(device) })
+            content.addView(deviceCard(device.displayName, seen, selectedDevice?.id == device.id) { selectDevice(device) })
         }
         selectedDevice?.let { device -> buildDeviceControls(device) }
         addStatus()
     }
 
     private fun buildDeviceControls(device: DeviceRecord) {
-        content.addView(section("Controls for ${device.displayName}"))
-        content.addView(button("View recent safety activity") { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) })
-        content.addView(button("Pause managed apps now") { sendCommand("pause", null) })
-        content.addView(button("Pause all child apps now") { sendCommand("pause", null, "all_child_apps") })
-        content.addView(button("Pause for 30 minutes") { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) })
-        content.addView(button("Resume access") { sendCommand("resume", null) })
-        content.addView(button("Check command delivery") { checkCommandDelivery() })
+        content.addView(section("${device.displayName} controls"))
+        content.addView(note("Choose a quick action, then adjust longer-term rules below. Commands are applied when the child device next syncs."))
+        content.addView(actionRow(
+            "Pause managed" to { sendCommand("pause", null) },
+            "Pause all" to { sendCommand("pause", null, "all_child_apps") }
+        ))
+        content.addView(actionRow(
+            "Pause 30 min" to { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) },
+            "Resume access" to { sendCommand("resume", null) }
+        ))
+        content.addView(actionRow(
+            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) },
+            "Delivery status" to { checkCommandDelivery() }
+        ))
 
         content.addView(section("Rules"))
         val keywords = field("Blocked keywords (comma separated)").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
@@ -205,23 +266,17 @@ class ParentModeActivity : android.app.Activity() {
             ))
         })
 
-        content.addView(section("Approve a newly installed app"))
-        content.addView(button("Choose from child app list") { startActivity(ManageAppsActivity.intent(this, device.id)) })
-        val packageName = field("Android package name, for example com.example.app")
-        content.addView(packageName)
-        content.addView(button("Approve this app") {
-            val app = packageName.text.toString().trim()
-            if (app.isBlank()) setStatus("Enter an Android package name.")
-            else publishPolicy(selectedPolicy.copy(approvedPackages = selectedPolicy.approvedPackages + app, blockedPackages = selectedPolicy.blockedPackages - app))
-        })
-        content.addView(button("Block this app") {
-            val app = packageName.text.toString().trim()
-            if (app.isBlank()) setStatus("Enter an Android package name.")
-            else publishPolicy(selectedPolicy.copy(blockedPackages = selectedPolicy.blockedPackages + app, approvedPackages = selectedPolicy.approvedPackages - app))
-        })
-        content.addView(section("Latest shared location"))
-        content.addView(button("Load latest location") { loadLocation() })
-        content.addView(button("View latest location on map") { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) })
+        content.addView(section("App approvals and selected-app controls"))
+        content.addView(note("Review the child’s reported apps, including apps waiting for approval. Select multiple apps to allow, block, or include in a managed pause."))
+        content.addView(button("Manage child apps") { startActivity(ManageAppsActivity.intent(this, device.id)) })
+        content.addView(section("Latest shared position"))
+        val latestLocation = note("Loading the latest shared check-in…")
+        content.addView(latestLocation)
+        content.addView(actionRow(
+            "Open live map" to { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) },
+            "Location log" to { startActivity(LocationLogActivity.intent(this, device.id, device.displayName)) }
+        ))
+        loadLatestLocationPreview(device, latestLocation)
 
         content.addView(section("Safe places"))
         content.addView(note(selectedPolicy.safePlaces.takeIf { it.isNotEmpty() }?.joinToString("\n") { "${it.name}: ${it.radiusMeters} m" } ?: "No safe places configured."))
@@ -257,7 +312,17 @@ class ParentModeActivity : android.app.Activity() {
             val api = ParentApi(usableParentSession(current))
             val loadedFamily = api.families().firstOrNull()
             val devices = if (loadedFamily == null) emptyList() else api.devices(loadedFamily.id)
-            runOnUiThread { family = loadedFamily; buildDashboard(devices); setStatus("Dashboard updated.") }
+            // Keep the current selection when possible; otherwise open the first child so the dashboard shows one latest position, not a history feed.
+            val deviceToShow = devices.firstOrNull { it.id == selectedDevice?.id } ?: devices.firstOrNull()
+            val remotePolicy = deviceToShow?.let { api.activePolicy(it.id) }
+            runOnUiThread {
+                family = loadedFamily
+                selectedDevice = deviceToShow
+                selectedVersion = remotePolicy?.version ?: 0
+                selectedPolicy = remotePolicy?.policy ?: ChildPolicy()
+                buildDashboard(devices)
+                setStatus("Dashboard updated.")
+            }
         }.start()
     }
 
@@ -365,6 +430,19 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
+    private fun loadLatestLocationPreview(device: DeviceRecord, target: TextView) {
+        val current = session ?: return
+        Thread {
+            val location = ParentApi(usableParentSession(current)).latestLocation(device.id)
+            runOnUiThread {
+                target.text = location?.let {
+                    "${String.format(java.util.Locale.US, "%.5f, %.5f", it.latitude, it.longitude)}\n" +
+                        "Updated ${it.recordedAt.replace('T', ' ').substringBefore('.')} • ±${it.accuracyMeters?.let { meters -> "${meters.toInt()} m" } ?: "unknown"}"
+                } ?: "No shared location yet. Enable visible location sharing on the child device to receive the next check-in."
+            }
+        }.start()
+    }
+
     private fun findPlace(query: String, name: EditText, latitude: EditText, longitude: EditText) {
         if (query.isBlank()) { setStatus("Enter a place name to search."); return }
         setStatus("Searching for $query…")
@@ -411,8 +489,12 @@ class ParentModeActivity : android.app.Activity() {
 
     private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
     private fun usableParentSession(fallback: ParentSession) = sessionStore.ensureFresh() ?: fallback
+    private fun eyebrow(text: String) = TextView(this).apply {
+        this.text = text; textSize = 12f; letterSpacing = .12f; setTextColor(Color.rgb(19, 102, 214)); typeface = Typeface.DEFAULT_BOLD
+        layoutParams = layoutParams(0, 4)
+    }
     private fun title(text: String) = TextView(this).apply {
-        this.text = text; textSize = 25f; gravity = Gravity.CENTER_HORIZONTAL; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
+        this.text = text; textSize = 27f; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
         layoutParams = layoutParams(0, 12)
     }
     private fun section(text: String) = TextView(this).apply {
@@ -429,6 +511,10 @@ class ParentModeActivity : android.app.Activity() {
     }
     private fun button(text: String, action: () -> Unit) = Button(this).apply {
         this.text = text; textSize = 15f; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214))
+        minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
+    }
+    private fun secondaryButton(text: String, action: () -> Unit) = Button(this).apply {
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = rounded(Color.WHITE, Color.rgb(171, 204, 244))
         minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
     }
     private fun addStatus() {
