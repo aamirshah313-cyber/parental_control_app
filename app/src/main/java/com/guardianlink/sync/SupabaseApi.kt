@@ -37,8 +37,33 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         })
     }
 
+    fun touchLastSeen() {
+        if (!enabled) return
+        patch("/rest/v1/devices?id=eq.$deviceId", JSONObject().apply { put("last_seen_at", java.time.Instant.now().toString()) })
+    }
+
+    fun postEvent(type: String, details: JSONObject = JSONObject()) {
+        if (!enabled) return
+        post("/rest/v1/device_events", JSONObject().apply {
+            put("device_id", deviceId)
+            put("event_type", type)
+            put("details", details)
+        })
+    }
+
+    fun postLocation(latitude: Double, longitude: Double, accuracyMeters: Float?) {
+        if (!enabled) return
+        post("/rest/v1/device_locations", JSONObject().apply {
+            put("device_id", deviceId)
+            put("latitude", latitude)
+            put("longitude", longitude)
+            accuracyMeters?.let { put("accuracy_meters", it) }
+        })
+    }
+
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
     private fun post(path: String, body: JSONObject) { request("POST", path, body.toString()) }
+    private fun patch(path: String, body: JSONObject) { request("PATCH", path, body.toString()) }
 
     private fun request(method: String, path: String, body: String?): String? = runCatching {
         (URL(baseUrl + path).openConnection() as HttpURLConnection).run {

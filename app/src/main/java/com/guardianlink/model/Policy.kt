@@ -15,6 +15,13 @@ data class AppLimit(
     val dailyMinutes: Int
 )
 
+data class SafePlace(
+    val name: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusMeters: Int
+)
+
 data class ChildPolicy(
     val version: Int = 1,
     val paused: Boolean = false,
@@ -25,7 +32,14 @@ data class ChildPolicy(
     val appLimits: List<AppLimit> = emptyList(),
     val blockedDomains: Set<String> = emptySet(),
     val blockedKeywords: Set<String> = emptySet(),
-    val blockYoutubeShorts: Boolean = true
+    val blockYoutubeShorts: Boolean = true,
+    /** Standard-mode installs are detected and blocked on first launch until approved. */
+    val requireAppApproval: Boolean = true,
+    val approvedPackages: Set<String> = emptySet(),
+    /** Location collection is opt-in and visibly runs as an Android foreground service. */
+    val locationEnabled: Boolean = false,
+    val locationIntervalMinutes: Int = 15,
+    val safePlaces: List<SafePlace> = emptyList()
 )
 
 data class EnforcementDecision(val blocked: Boolean, val reason: String? = null)

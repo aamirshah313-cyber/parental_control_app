@@ -1,46 +1,51 @@
 # Guardian Link
 
-Android-first parental-control foundation with local time rules, immediate managed-app pause, basic YouTube Shorts/keyword policy evaluation, and a privacy-preserving Supabase control plane.
+Android-first parental-control app with cloud-backed parent controls, offline child enforcement, supervised browsing, and explicit visible location sharing.
 
-## What works locally now
+## Included modules
 
-- A bedtime schedule (9 PM–7 AM) for managed apps.
-- Pause now, pause 30 minutes, and resume controls.
-- YouTube is the default managed app (`com.google.android.youtube`).
-- Local keyword matching and a `/shorts/` URL policy engine for a future supervised browser.
-- A supervised browser that blocks configured domains, `/shorts/` URLs, and matching page titles locally.
-- A foreground protection service that checks the foreground managed app every 3 seconds.
+- Parent Supabase sign-in, family loading, paired-device list, and cloud pairing-code generation.
+- Single-use pairing-code duration choices: 10 minutes, 30 minutes, 1 hour, or 24 hours.
+- Remote pause now, 30-minute pause, and resume commands.
+- Cloud policies for daily bedtime, keywords, YouTube Shorts links in the supervised browser, app blocking, new-app approval, and child location sharing.
+- Offline child enforcement for downloaded schedules, pauses, app blocks, and browser filtering.
+- Standard-mode new-app detection: a newly installed app is locally blocked until a parent publishes an approval.
+- Visible, opt-in child location sharing with coordinates, accuracy, and recorded time in the Parent Dashboard.
+- Safe places (name, coordinates, radius) evaluated locally on the child phone, with only enter/leave events uploaded.
 
-The parent controls currently demonstrate on the same phone. The child sync worker downloads the active Supabase policy and accepts the latest pause/resume command once the device has paired credentials.
+## Build
 
-## Android Studio setup
+1. Open this folder in Android Studio or run `gradlew.bat :app:assembleDebug` with JDK 17 and Android SDK API 34.
+2. Create a local `local.properties` containing `SUPABASE_URL=https://YOUR_PROJECT.supabase.co` and `SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY`.
+3. Never put a Supabase secret/service-role key in the Android app.
 
-1. Open this folder in Android Studio Hedgehog or newer.
-2. Let Android Studio generate the Gradle wrapper if prompted.
-3. Use JDK 17 and install Android SDK Platform 35.
-4. Run on a physical Android 8.0+ device.
-5. In **Set up this child device**, grant **Usage Access**, then enable protection.
+## Supabase deployment
 
-## Supabase setup
+1. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor if the base schema is not already installed.
+2. Run [`supabase/migrations/20260828_parent_dashboard.sql`](supabase/migrations/20260828_parent_dashboard.sql) after the base schema. It adds location storage, new event types, and the limited child last-seen permission.
+3. Deploy the pairing functions, including the new validity chooser:
 
-1. Create a Supabase project on the Free plan.
-2. Run [`supabase/schema.sql`](supabase/schema.sql) in the SQL Editor.
-3. Create a local `local.properties` file containing `SUPABASE_URL=https://YOUR_PROJECT.supabase.co` and `SUPABASE_ANON_KEY=YOUR_PUBLIC_ANON_KEY`. Never put the Supabase service-role key in the Android app.
-4. Deploy the included pairing functions: `supabase functions deploy create-pairing` and `supabase functions deploy claim-child-device`.
-5. After parent sign-in, call `create-pairing` with `family_id` and `child_name`. It returns a single-use code valid for 10 minutes. Paste that code into **Set up this child device** on the child phone. The child receives its own scoped Auth session; it never receives the parent session.
-6. The child’s active protection service polls for a policy or pause/resume command every 30 seconds; this is the no-extra-dependency fallback. Add a Supabase Realtime subscription or FCM push path for genuinely immediate remote pause commands.
+   ```powershell
+   npx supabase@latest functions deploy create-pairing --use-api
+   npx supabase@latest functions deploy claim-child-device --no-verify-jwt --use-api
+   ```
+
+4. On the parent phone, sign in and generate a pairing code. On the child phone, paste it in **Set up this child device**, then grant Usage Access and enable protection.
+5. To share location, the parent enables the policy, then the child phone explicitly grants Android location permission and starts **visible location sharing**.
 
 ## Enforcement boundaries
 
-- Schedules and an already-downloaded pause continue offline.
-- A remote pause can only be received when the child device reconnects.
-- This starter locks managed apps; it does not claim to cut off all device internet traffic.
-- Blocking `youtube.com/shorts/` is reliable in a supervised browser. Selective Shorts filtering inside the official YouTube app is not guaranteed.
+- Schedules and an already-downloaded pause continue offline. The active pause is stored separately so a later policy refresh cannot cancel it.
+- A remote command is received on the child phone's next policy sync (currently every 30 seconds).
+- Standard mode detects and blocks a new app after installation; true approval *before* installation requires Android Device Owner enrollment on a dedicated child phone.
+- The app does not claim to cut all device internet traffic yet. A transparent VPN/DNS module is the next layer for a stronger device-wide internet pause and domain filter.
+- Blocking `/shorts/` is reliable in the supervised browser. Selective Shorts filtering inside the official YouTube app is not guaranteed.
+- Location is deliberately not hidden: it has a persistent Android foreground-service notification and requires the child phone's permission.
 - Do not collect private messages, keystrokes, camera, microphone, or hidden screenshots.
 
-## Next implementation slice
+## Remaining advanced modules
 
-1. Parent authentication and QR pairing.
-2. Sync policy JSON and command acknowledgements through Supabase.
-3. Add a supervised browser screen using `PolicyEngine.pageDecision`.
-4. Add a transparent VPN/DNS filtering mode only if whole-device web filtering is required.
+1. Supabase Realtime or FCM delivery for faster remote commands and parent notifications.
+2. Device-event history, safe-place geofences, location history, and retention/deletion controls.
+3. Transparent VPN/DNS filtering.
+4. Android Device Owner enrollment for stronger tamper resistance and true pre-install controls.

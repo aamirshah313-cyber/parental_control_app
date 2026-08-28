@@ -9,6 +9,7 @@ class PolicySynchronizer(private val context: Context) {
         val session = DeviceSessionStore(context)
         if (!session.isPaired()) return true
         val api = SupabaseApi(session.deviceId!!, session.accessToken!!)
+        api.touchLastSeen()
         val store = PolicyStore(context)
         api.fetchActivePolicy()?.let { raw -> store.saveFromCloudJson(raw) }
         api.fetchLatestCommand()?.takeIf { it.id != session.lastHandledCommandId }?.let { command ->
