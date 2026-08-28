@@ -138,6 +138,7 @@ class ParentModeActivity : android.app.Activity() {
 
     private fun buildDeviceControls(device: DeviceRecord) {
         content.addView(section("Controls for ${device.displayName}"))
+        content.addView(button("View recent safety activity") { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) })
         content.addView(button("Pause managed apps now") { sendCommand("pause", null) })
         content.addView(button("Pause for 30 minutes") { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) })
         content.addView(button("Resume access") { sendCommand("resume", null) })

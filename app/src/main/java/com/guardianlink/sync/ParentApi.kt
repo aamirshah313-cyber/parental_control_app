@@ -16,6 +16,7 @@ data class PairingCode(val code: String, val expiresInSeconds: Int)
 data class LocationRecord(val latitude: Double, val longitude: Double, val accuracyMeters: Float?, val recordedAt: String)
 data class VersionedPolicy(val version: Int, val policy: ChildPolicy)
 data class SosAlert(val id: String, val deviceId: String, val message: String, val createdAt: String)
+data class DeviceEvent(val eventType: String, val details: JSONObject, val createdAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -101,6 +102,14 @@ class ParentApi(private val session: ParentSession) {
         (0 until rows.length()).map { index ->
             val row = rows.getJSONObject(index)
             SosAlert(row.getString("id"), row.getString("device_id"), row.optJSONObject("details")?.optString("message", "Emergency SOS") ?: "Emergency SOS", row.getString("created_at"))
+        }
+    } ?: emptyList()
+
+    /** The parent-readable audit trail. It intentionally excludes browsing history and message content. */
+    fun recentEvents(deviceId: String): List<DeviceEvent> = get("/rest/v1/device_events?device_id=eq.$deviceId&select=event_type,details,created_at&order=created_at.desc&limit=30")?.let { rows ->
+        (0 until rows.length()).map { index ->
+            val row = rows.getJSONObject(index)
+            DeviceEvent(row.getString("event_type"), row.optJSONObject("details") ?: JSONObject(), row.getString("created_at"))
         }
     } ?: emptyList()
 
