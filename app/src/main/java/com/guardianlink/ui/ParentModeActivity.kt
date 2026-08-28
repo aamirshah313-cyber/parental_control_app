@@ -3,6 +3,8 @@ package com.guardianlink.ui
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
@@ -35,6 +37,7 @@ class ParentModeActivity : android.app.Activity() {
     private var selectedPolicy = ChildPolicy()
     /** Kept only in memory: raw pairing codes must never be persisted after display. */
     private var lastPairingMessage: String? = null
+    private var lastPairingCode: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,10 +98,19 @@ class ParentModeActivity : android.app.Activity() {
         val durationPicker = Spinner(this).apply { adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, durations.map { it.first }) }
         content.addView(childName); content.addView(durationPicker)
         val pairingCodeOutput = TextView(this).apply { text = lastPairingMessage.orEmpty() }
+        val copyPairingCode = button("Copy pairing code") {
+            val code = lastPairingCode
+            if (code == null) setStatus("Generate a pairing code first.")
+            else {
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Guardian Link pairing code", code))
+                setStatus("Pairing code copied. Paste it on the child phone.")
+            }
+        }.apply { isEnabled = lastPairingCode != null }
         content.addView(button("Generate one-time pairing code") {
-            createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, pairingCodeOutput)
+            createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, pairingCodeOutput, copyPairingCode)
         })
         content.addView(pairingCodeOutput)
+        content.addView(copyPairingCode)
 
         content.addView(section("Child devices"))
         if (devices.isEmpty()) content.addView(note("No child device paired yet."))
@@ -197,7 +209,7 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun createPairing(childName: String, validity: Int, output: TextView) {
+    private fun createPairing(childName: String, validity: Int, output: TextView, copyButton: Button) {
         val current = session ?: return
         val activeFamily = family ?: return
         if (childName.isBlank()) { setStatus("Enter a child/device name."); return }
@@ -207,7 +219,11 @@ class ParentModeActivity : android.app.Activity() {
             runOnUiThread {
                 val message = result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
                     ?: "Could not create pairing code. Confirm the updated Edge Function is deployed."
-                if (result != null) lastPairingMessage = message
+                if (result != null) {
+                    lastPairingMessage = message
+                    lastPairingCode = result.code
+                    copyButton.isEnabled = true
+                }
                 output.text = message
                 setStatus(message)
                 // Do not refresh here: rebuilding the dashboard would erase the only display of the raw, hashed-on-server code.
@@ -261,7 +277,7 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; buildSignIn() }
+    private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
     private fun title(text: String) = TextView(this).apply { this.text = text; textSize = 24f; gravity = Gravity.CENTER_HORIZONTAL }
     private fun section(text: String) = TextView(this).apply { this.text = "\n$text"; textSize = 18f }
     private fun note(text: String) = TextView(this).apply { this.text = text }
