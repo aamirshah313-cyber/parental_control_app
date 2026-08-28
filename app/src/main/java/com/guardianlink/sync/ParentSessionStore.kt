@@ -7,18 +7,19 @@ data class ParentSession(val userId: String, val accessToken: String, val refres
 /** Parent credentials remain local to the parent phone and are never copied to a child device. */
 class ParentSessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("guardian_parent_session", Context.MODE_PRIVATE)
+    private val secure = SecureTokenStore(context, "guardian_parent_session")
 
     fun load(): ParentSession? {
         val userId = prefs.getString("user_id", null) ?: return null
-        val token = prefs.getString("access_token", null) ?: return null
-        return ParentSession(userId, token, prefs.getString("refresh_token", null))
+        val token = secure.get("access_token") ?: return null
+        return ParentSession(userId, token, secure.get("refresh_token"))
     }
 
-    fun save(session: ParentSession) = prefs.edit()
-        .putString("user_id", session.userId)
-        .putString("access_token", session.accessToken)
-        .putString("refresh_token", session.refreshToken)
-        .apply()
+    fun save(session: ParentSession) {
+        prefs.edit().putString("user_id", session.userId).apply()
+        secure.put("access_token", session.accessToken)
+        secure.put("refresh_token", session.refreshToken)
+    }
 
     fun clear() = prefs.edit().clear().apply()
 
