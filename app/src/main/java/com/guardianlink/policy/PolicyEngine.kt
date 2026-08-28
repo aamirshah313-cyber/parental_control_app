@@ -7,7 +7,7 @@ import java.time.LocalDateTime
 class PolicyEngine {
     fun appDecision(policy: ChildPolicy, packageName: String, usedTodayMinutes: Int, now: LocalDateTime = LocalDateTime.now()): EnforcementDecision {
         val pauseActive = policy.paused && (policy.pauseUntilEpochMs == null || System.currentTimeMillis() < policy.pauseUntilEpochMs)
-        if (pauseActive && packageName in policy.managedPackages) return EnforcementDecision(true, "Paused by your parent")
+        if (pauseActive && (policy.pauseAllApps && !isEssentialPackage(packageName) || packageName in policy.managedPackages)) return EnforcementDecision(true, "Paused by your parent")
         if (packageName in policy.blockedPackages) return EnforcementDecision(true, "This app is blocked")
         if (packageName !in policy.managedPackages) return EnforcementDecision(false)
         policy.schedules.firstOrNull { schedule ->
@@ -41,4 +41,11 @@ class PolicyEngine {
         return (now.dayOfWeek in schedule.days && currentTime >= schedule.start) ||
             (now.minusDays(1).dayOfWeek in schedule.days && currentTime < schedule.end)
     }
+
+    /** Normal app mode cannot safely lock the launcher, system UI, emergency dialer, or Guardian Link itself. */
+    private fun isEssentialPackage(packageName: String): Boolean = packageName == "com.guardianlink" || packageName in setOf(
+        "android", "com.android.systemui", "com.android.settings", "com.android.permissioncontroller",
+        "com.google.android.permissioncontroller", "com.android.packageinstaller", "com.google.android.packageinstaller",
+        "com.android.dialer", "com.google.android.dialer"
+    )
 }

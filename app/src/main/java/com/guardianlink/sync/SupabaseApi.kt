@@ -6,7 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class RemoteCommand(val id: String, val type: String, val expiresAtEpochMs: Long?)
+data class RemoteCommand(val id: String, val type: String, val scope: String, val expiresAtEpochMs: Long?)
+data class ReportedAppPayload(val packageName: String, val displayName: String, val pendingApproval: Boolean? = null)
 
 /** Small dependency-free REST client. The app uses its public anon key plus the child device JWT. */
 class SupabaseApi(private val deviceId: String, private val accessToken: String) {
@@ -21,11 +22,11 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
 
     fun fetchLatestCommand(): RemoteCommand? {
         if (!enabled) return null
-        val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&order=created_at.desc&limit=1&select=id,command_type,expires_at") ?: return null
+        val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&order=created_at.desc&limit=1&select=id,command_type,scope,expires_at") ?: return null
         if (records.length() == 0) return null
         val command = records.getJSONObject(0)
         val expiry = command.optString("expires_at").takeIf { it.isNotBlank() }?.let { java.time.Instant.parse(it).toEpochMilli() }
-        return RemoteCommand(command.getString("id"), command.getString("command_type"), expiry)
+        return RemoteCommand(command.getString("id"), command.getString("command_type"), command.optString("scope", "managed_apps"), expiry)
     }
 
     fun acknowledge(commandId: String, status: String) {
@@ -61,11 +62,20 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         })
     }
 
+    fun upsertReportedApps(apps: List<ReportedAppPayload>): Boolean {
+        if (!enabled || apps.isEmpty()) return apps.isEmpty()
+        val body = JSONArray().apply { apps.forEach { app -> put(JSONObject().apply {
+            put("device_id", deviceId); put("package_name", app.packageName); put("display_name", app.displayName); put("last_reported_at", java.time.Instant.now().toString())
+            app.pendingApproval?.let { put("pending_approval", it) }
+        }) } }
+        return request("POST", "/rest/v1/device_apps?on_conflict=device_id,package_name", body.toString(), "resolution=merge-duplicates,return=minimal") != null
+    }
+
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
     private fun post(path: String, body: JSONObject) { request("POST", path, body.toString()) }
     private fun patch(path: String, body: JSONObject) { request("PATCH", path, body.toString()) }
 
-    private fun request(method: String, path: String, body: String?): String? = runCatching {
+    private fun request(method: String, path: String, body: String?, prefer: String = "return=minimal"): String? = runCatching {
         (URL(baseUrl + path).openConnection() as HttpURLConnection).run {
             requestMethod = method
             connectTimeout = 10_000
@@ -73,7 +83,7 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
             setRequestProperty("apikey", BuildConfig.SUPABASE_ANON_KEY)
             setRequestProperty("Authorization", "Bearer $accessToken")
             setRequestProperty("Content-Type", "application/json")
-            setRequestProperty("Prefer", "return=minimal")
+            setRequestProperty("Prefer", prefer)
             if (body != null) { doOutput = true; outputStream.bufferedWriter().use { it.write(body) } }
             if (responseCode !in 200..299) return@run null
             inputStream.bufferedReader().use { it.readText() }

@@ -22,6 +22,7 @@ class PackageChangedReceiver : BroadcastReceiver() {
         val pending = goAsync()
         Thread {
             val session = DeviceSessionStore(context)
+            AppInventoryReporter(context).reportPackage(packageName, policy.requireAppApproval && packageName !in policy.approvedPackages)
             if (session.isPaired()) SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("app_installed", JSONObject().apply {
                 put("package_name", packageName)
                 put("pending_approval", policy.requireAppApproval && packageName !in policy.approvedPackages)

@@ -27,25 +27,27 @@ class PolicyStore(context: Context) {
             resume()
             return policy
         }
-        return policy.copy(paused = pauseActive, pauseUntilEpochMs = until)
+        return policy.copy(paused = pauseActive, pauseUntilEpochMs = until, pauseAllApps = prefs.getBoolean("command_pause_all_apps", false))
     }
 
     fun save(policy: ChildPolicy) {
         // Pause is a command state, kept separately so a normal cloud policy refresh cannot cancel it.
         val pending = (prefs.getStringSet("pending_approval_packages", emptySet()) ?: emptySet()) - policy.approvedPackages
         prefs.edit()
-            .putString("policy_json", PolicyJson.encode(policy.copy(paused = false, pauseUntilEpochMs = null)))
+            .putString("policy_json", PolicyJson.encode(policy.copy(paused = false, pauseUntilEpochMs = null, pauseAllApps = false)))
             .putStringSet("pending_approval_packages", pending)
             .apply()
     }
 
-    fun setPause(untilEpochMs: Long?) = prefs.edit()
+    fun setPause(untilEpochMs: Long?, allApps: Boolean = false) = prefs.edit()
         .putBoolean("command_pause_active", true)
+        .putBoolean("command_pause_all_apps", allApps)
         .putLong("command_pause_until", untilEpochMs ?: 0)
         .apply()
 
     fun resume() = prefs.edit()
         .putBoolean("command_pause_active", false)
+        .remove("command_pause_all_apps")
         .remove("command_pause_until")
         .apply()
 

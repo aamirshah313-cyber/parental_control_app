@@ -15,6 +15,7 @@ object PolicyJson {
         put("version", policy.version)
         put("paused", policy.paused)
         put("pause_until_epoch_ms", policy.pauseUntilEpochMs)
+        put("pause_all_apps", policy.pauseAllApps)
         put("managed_packages", JSONArray(policy.managedPackages.toList()))
         put("blocked_packages", JSONArray(policy.blockedPackages.toList()))
         put("blocked_domains", JSONArray(policy.blockedDomains.toList()))
@@ -48,6 +49,7 @@ object PolicyJson {
             version = data.optInt("version", 1),
             paused = data.optBoolean("paused", false),
             pauseUntilEpochMs = data.optLong("pause_until_epoch_ms", 0).takeIf { it > 0 },
+            pauseAllApps = data.optBoolean("pause_all_apps", false),
             managedPackages = data.stringSet("managed_packages", setOf("com.google.android.youtube")),
             blockedPackages = data.stringSet("blocked_packages", emptySet()),
             blockedDomains = data.stringSet("blocked_domains", emptySet()),

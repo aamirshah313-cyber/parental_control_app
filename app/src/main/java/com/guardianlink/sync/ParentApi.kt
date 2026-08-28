@@ -18,6 +18,8 @@ data class VersionedPolicy(val version: Int, val policy: ChildPolicy)
 data class SosAlert(val id: String, val deviceId: String, val message: String, val createdAt: String)
 data class DeviceEvent(val eventType: String, val details: JSONObject, val createdAt: String)
 data class CommandDeliveryStatus(val commandType: String, val sentAt: String, val acknowledgement: String?, val acknowledgedAt: String?)
+data class ReportedApp(val packageName: String, val displayName: String, val pendingApproval: Boolean, val lastReportedAt: String)
+data class AppInstallRequest(val id: String, val deviceId: String, val packageName: String, val createdAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -72,8 +74,8 @@ class ParentApi(private val session: ParentSession) {
         return PairingCode(result.getString("pair_code"), result.optInt("expires_in_seconds", validitySeconds))
     }
 
-    fun sendCommand(deviceId: String, command: String, expiresAtEpochMs: Long? = null): Boolean = post("/rest/v1/parent_commands", JSONObject().apply {
-        put("device_id", deviceId); put("command_type", command); put("scope", "managed_apps")
+    fun sendCommand(deviceId: String, command: String, expiresAtEpochMs: Long? = null, scope: String = "managed_apps"): Boolean = post("/rest/v1/parent_commands", JSONObject().apply {
+        put("device_id", deviceId); put("command_type", command); put("scope", scope)
         expiresAtEpochMs?.let { put("expires_at", java.time.Instant.ofEpochMilli(it).toString()) }
     }) != null
 
@@ -127,6 +129,22 @@ class ParentApi(private val session: ParentSession) {
         (0 until rows.length()).map { index ->
             val row = rows.getJSONObject(index)
             DeviceEvent(row.getString("event_type"), row.optJSONObject("details") ?: JSONObject(), row.getString("created_at"))
+        }
+    } ?: emptyList()
+
+    fun reportedApps(deviceId: String): List<ReportedApp> = get("/rest/v1/device_apps?device_id=eq.$deviceId&select=package_name,display_name,pending_approval,last_reported_at&order=display_name.asc")?.let { rows ->
+        (0 until rows.length()).map { index ->
+            val row = rows.getJSONObject(index)
+            ReportedApp(row.getString("package_name"), row.getString("display_name"), row.optBoolean("pending_approval", false), row.getString("last_reported_at"))
+        }
+    } ?: emptyList()
+
+    fun recentAppInstallRequests(): List<AppInstallRequest> = get("/rest/v1/device_events?event_type=eq.app_installed&select=id,device_id,details,created_at&order=created_at.desc&limit=20")?.let { rows ->
+        (0 until rows.length()).mapNotNull { index ->
+            val row = rows.getJSONObject(index)
+            val details = row.optJSONObject("details") ?: return@mapNotNull null
+            if (!details.optBoolean("pending_approval", false)) return@mapNotNull null
+            AppInstallRequest(row.getString("id"), row.getString("device_id"), details.optString("package_name", "Unknown app"), row.getString("created_at"))
         }
     } ?: emptyList()
 

@@ -26,6 +26,8 @@ data class ChildPolicy(
     val version: Int = 1,
     val paused: Boolean = false,
     val pauseUntilEpochMs: Long? = null,
+    /** Transient command state: pause all launchable child apps except essential Android surfaces. */
+    val pauseAllApps: Boolean = false,
     val managedPackages: Set<String> = setOf("com.google.android.youtube"),
     val blockedPackages: Set<String> = emptySet(),
     val schedules: List<ScheduleRule> = emptyList(),

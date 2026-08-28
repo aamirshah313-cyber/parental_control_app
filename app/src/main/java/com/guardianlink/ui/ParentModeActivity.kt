@@ -102,6 +102,7 @@ class ParentModeActivity : android.app.Activity() {
         startForegroundService(android.content.Intent(this, SosAlertService::class.java))
         content.addView(note("Family: ${activeFamily.name}"))
         content.addView(button("Refresh devices") { refreshFamily() })
+        content.addView(button("Enable parent SOS and app-request alerts") { enableParentAlerts() })
         content.addView(button("Enable SOS receiver") { startForegroundService(android.content.Intent(this, SosAlertService::class.java)); setStatus("SOS receiver enabled. It checks for alerts every 5 seconds.") })
         content.addView(button("Stop SOS alarm / receiver") { SosAlertService.stopAlarm(this); setStatus("SOS receiver stopped.") })
         content.addView(button("Sign out") { signOut() })
@@ -140,6 +141,7 @@ class ParentModeActivity : android.app.Activity() {
         content.addView(section("Controls for ${device.displayName}"))
         content.addView(button("View recent safety activity") { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) })
         content.addView(button("Pause managed apps now") { sendCommand("pause", null) })
+        content.addView(button("Pause all child apps now") { sendCommand("pause", null, "all_child_apps") })
         content.addView(button("Pause for 30 minutes") { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) })
         content.addView(button("Resume access") { sendCommand("resume", null) })
         content.addView(button("Check command delivery") { checkCommandDelivery() })
@@ -167,6 +169,7 @@ class ParentModeActivity : android.app.Activity() {
         })
 
         content.addView(section("Approve a newly installed app"))
+        content.addView(button("Choose from child app list") { startActivity(ManageAppsActivity.intent(this, device.id)) })
         val packageName = field("Android package name, for example com.example.app")
         content.addView(packageName)
         content.addView(button("Approve this app") {
@@ -230,6 +233,14 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
+    private fun enableParentAlerts() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 21)
+        }
+        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
+        setStatus("Parent alerts enabled. SOS and new-app approval requests are checked every 5 seconds while the receiver remains active.")
+    }
+
     private fun createPairing(childName: String, validity: Int, output: TextView, copyButton: Button) {
         val current = session ?: return
         val activeFamily = family ?: return
@@ -262,12 +273,12 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun sendCommand(command: String, expiry: Long?) {
+    private fun sendCommand(command: String, expiry: Long?, scope: String = "managed_apps") {
         val current = session ?: return
         val device = selectedDevice ?: return
         setStatus("Sending $command command…")
         Thread {
-            val ok = ParentApi(current).sendCommand(device.id, command, expiry)
+            val ok = ParentApi(current).sendCommand(device.id, command, expiry, scope)
             runOnUiThread { setStatus(if (ok) "Command sent. The child phone applies it when it next syncs." else "Could not send command.") }
         }.start()
     }

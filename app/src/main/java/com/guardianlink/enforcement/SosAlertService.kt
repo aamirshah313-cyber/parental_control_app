@@ -2,9 +2,11 @@ package com.guardianlink.enforcement
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
@@ -14,8 +16,9 @@ import android.os.IBinder
 import android.os.Looper
 import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
+import com.guardianlink.ui.ParentModeActivity
 
-/** Parent-side opt-in receiver. It polls the family's RLS-scoped SOS events without a paid push service. */
+/** Parent-side opt-in receiver for SOS alarms and post-install parent-approval requests. */
 class SosAlertService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var ringtone: Ringtone? = null
@@ -24,7 +27,7 @@ class SosAlertService : Service() {
 
     private val poll = object : Runnable {
         override fun run() {
-            pollForSos()
+            pollForAlerts()
             handler.postDelayed(this, 5_000)
         }
     }
@@ -35,20 +38,42 @@ class SosAlertService : Service() {
         startForeground(1003, android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Guardian Link SOS receiver is active")
-            .setContentText("An alarm will play for a child SOS alert")
+            .setContentText("SOS alarms and app approval requests are monitored")
             .setOngoing(true)
             .build())
         handler.post(poll)
     }
 
-    private fun pollForSos() {
+    private fun pollForAlerts() {
         val session = ParentSessionStore(this).load() ?: return
         Thread {
-            val latest = ParentApi(session).recentSosAlerts().firstOrNull() ?: return@Thread
-            if (latest.id == prefs.getString("last_sos_id", null)) return@Thread
-            prefs.edit().putString("last_sos_id", latest.id).apply()
-            handler.post { playAlarm() }
+            val api = ParentApi(session)
+            api.recentSosAlerts().firstOrNull()?.let { latest ->
+                if (latest.id != prefs.getString("last_sos_id", null)) {
+                    prefs.edit().putString("last_sos_id", latest.id).apply()
+                    handler.post { playAlarm() }
+                }
+            }
+            api.recentAppInstallRequests().firstOrNull()?.let { request ->
+                if (request.id != prefs.getString("last_app_request_id", null)) {
+                    prefs.edit().putString("last_app_request_id", request.id).apply()
+                    handler.post { showAppRequest(request.packageName) }
+                }
+            }
         }.start()
+    }
+
+    private fun showAppRequest(packageName: String) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val openDashboard = PendingIntent.getActivity(this, 0, Intent(this, ParentModeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        getSystemService(NotificationManager::class.java).notify(1204, android.app.Notification.Builder(this, "sos_receiver")
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setContentTitle("App approval requested")
+            .setContentText("Child installed: $packageName")
+            .setStyle(android.app.Notification.BigTextStyle().bigText("A child app is waiting for approval: $packageName. Open Guardian Link to allow or block it."))
+            .setContentIntent(openDashboard)
+            .setAutoCancel(true)
+            .build())
     }
 
     private fun playAlarm() {
