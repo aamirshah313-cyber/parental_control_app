@@ -75,5 +75,6 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 ## Before public distribution
 
 - Create a privacy policy, consent flow, data-retention period, and account/family deletion controls.
+- Complete and publish the editable [privacy-policy template](docs/PRIVACY_POLICY_TEMPLATE.md), including a real support contact and deletion process.
 - Replace the debug signing key with your own release signing key.
 - Review Google Play’s Families, background-location, accessibility, and device-management requirements before publishing.

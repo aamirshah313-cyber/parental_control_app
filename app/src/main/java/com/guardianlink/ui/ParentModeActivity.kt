@@ -70,9 +70,14 @@ class ParentModeActivity : android.app.Activity() {
         content.removeAllViews()
         content.addView(title("Parent dashboard"))
         content.addView(note("Sign in or create a parent account. Each parent account can access only its own family data."))
+        content.addView(button("Read privacy and child-data notice") { showPrivacyNotice() })
         val email = field("Parent email", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         val password = field("Password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val guardianConsent = CheckBox(this).apply {
+            text = "I confirm that I am the parent or legal guardian authorized to supervise this child device."
+        }
         content.addView(email); content.addView(password)
+        content.addView(guardianConsent)
         content.addView(button("Sign in") {
             setStatus("Signing in…")
             Thread {
@@ -87,6 +92,7 @@ class ParentModeActivity : android.app.Activity() {
             val emailText = email.text.toString().trim()
             val passwordText = password.text.toString()
             if (emailText.isBlank() || passwordText.length < 8) { setStatus("Enter an email and a password of at least 8 characters."); return@button }
+            if (!guardianConsent.isChecked) { setStatus("Confirm that you are authorized to supervise the child device before creating an account."); return@button }
             setStatus("Creating parent account…")
             Thread {
                 val result = ParentApi.signUp(emailText, passwordText)
@@ -100,6 +106,20 @@ class ParentModeActivity : android.app.Activity() {
             }.start()
         })
         addStatus()
+    }
+
+    private fun showPrivacyNotice() {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Privacy and child-data notice")
+            .setMessage(
+                "This app is for parents or legal guardians supervising a child device with appropriate notice and consent. " +
+                    "Depending on the rules you enable, it can process the child device name, installed-app reports, safety events, and visible location check-ins. " +
+                    "This information is sent to the Supabase project configured by the app publisher and is available to the authorized parent account.\n\n" +
+                    "Do not use the app to monitor adults or anyone without legal authority and their required consent. " +
+                    "The publisher must provide a completed privacy policy, support contact, and data-deletion process before public release."
+            )
+            .setPositiveButton("I understand", null)
+            .show()
     }
 
     private fun buildDashboard(devices: List<DeviceRecord>) {
