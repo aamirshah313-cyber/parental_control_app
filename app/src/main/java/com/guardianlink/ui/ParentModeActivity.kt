@@ -33,6 +33,8 @@ class ParentModeActivity : android.app.Activity() {
     private var selectedDevice: DeviceRecord? = null
     private var selectedVersion = 0
     private var selectedPolicy = ChildPolicy()
+    /** Kept only in memory: raw pairing codes must never be persisted after display. */
+    private var lastPairingMessage: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,7 +94,7 @@ class ParentModeActivity : android.app.Activity() {
         val durations = listOf("10 minutes" to 600, "30 minutes" to 1_800, "1 hour" to 3_600, "24 hours" to 86_400)
         val durationPicker = Spinner(this).apply { adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, durations.map { it.first }) }
         content.addView(childName); content.addView(durationPicker)
-        val pairingCodeOutput = TextView(this)
+        val pairingCodeOutput = TextView(this).apply { text = lastPairingMessage.orEmpty() }
         content.addView(button("Generate one-time pairing code") {
             createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, pairingCodeOutput)
         })
@@ -205,6 +207,7 @@ class ParentModeActivity : android.app.Activity() {
             runOnUiThread {
                 val message = result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
                     ?: "Could not create pairing code. Confirm the updated Edge Function is deployed."
+                if (result != null) lastPairingMessage = message
                 output.text = message
                 setStatus(message)
                 // Do not refresh here: rebuilding the dashboard would erase the only display of the raw, hashed-on-server code.
