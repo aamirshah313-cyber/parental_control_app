@@ -2,6 +2,8 @@ package com.guardianlink.sync
 
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import com.guardianlink.enforcement.LocationService
 import com.guardianlink.enforcement.AppInventoryReporter
 import com.guardianlink.policy.PolicyStore
@@ -16,7 +18,13 @@ class PolicySynchronizer(private val context: Context) {
         AppInventoryReporter(context).reportIfDue()
         val store = PolicyStore(context)
         api.fetchActivePolicy()?.let { raw -> store.saveFromCloudJson(raw) }
-        if (!store.load().locationEnabled) context.stopService(Intent(context, LocationService::class.java))
+        val updatedPolicy = store.load()
+        if (!updatedPolicy.locationEnabled) context.stopService(Intent(context, LocationService::class.java))
+        else if (context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("permissions_unlocked", false) &&
+            (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
+            // Once the child has completed step 5 and explicitly granted location, future parent enable/disable changes can work remotely.
+            runCatching { context.startForegroundService(Intent(context, LocationService::class.java)) }
+        }
         api.fetchLatestCommand()?.takeIf { it.id != session.lastHandledCommandId }?.let { command ->
             when {
                 command.expiresAtEpochMs != null && command.expiresAtEpochMs < System.currentTimeMillis() -> api.acknowledge(command.id, "expired")

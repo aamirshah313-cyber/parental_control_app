@@ -73,8 +73,7 @@ class LiveLocationActivity : android.app.Activity() {
     }
 
     private fun openExternalMap(latitude: Double, longitude: Double) {
-        val geo = Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")
-        startActivity(Intent(Intent.ACTION_VIEW, geo))
+        MapNavigator.openCoordinates(this, latitude, longitude)
     }
 
     private fun button(label: String, action: () -> Unit) = Button(this).apply {

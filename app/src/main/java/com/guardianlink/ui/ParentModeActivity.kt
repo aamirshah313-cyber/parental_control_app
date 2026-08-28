@@ -196,6 +196,7 @@ class ParentModeActivity : android.app.Activity() {
         content.addView(safeSearch)
         content.addView(button("Find place coordinates") { findPlace(safeSearch.text.toString(), safeName, safeLatitude, safeLongitude) })
         listOf(safeName, safeLatitude, safeLongitude, safeRadius).forEach(content::addView)
+        content.addView(button("Use child's latest check-in as point") { useLatestLocationForSafePlace(safeLatitude, safeLongitude) })
         content.addView(button("Preview safe place on map") { openMapPreview(safeLatitude.text.toString(), safeLongitude.text.toString()) })
         content.addView(button("Add safe place") {
             val place = runCatching {
@@ -331,9 +332,12 @@ class ParentModeActivity : android.app.Activity() {
         if (query.isBlank()) { setStatus("Enter a place name to search."); return }
         setStatus("Searching for $query…")
         Thread {
-            val result = runCatching { Geocoder(this).getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
+            val result = runCatching { if (Geocoder.isPresent()) Geocoder(this).getFromLocationName(query, 1)?.firstOrNull() else null }.getOrNull()
             runOnUiThread {
-                if (result == null) setStatus("Place not found. Try a more specific name or enter coordinates manually.")
+                if (result == null) {
+                    MapNavigator.searchPlace(this, query)
+                    setStatus("Automatic coordinate lookup is unavailable on this phone. Map search was opened; choose the place there, then enter its coordinates here, or use the child's latest check-in as the point.")
+                }
                 else {
                     name.setText(result.featureName ?: query)
                     latitude.setText(result.latitude.toString())
@@ -348,7 +352,24 @@ class ParentModeActivity : android.app.Activity() {
         val latitude = latitudeText.toDoubleOrNull()
         val longitude = longitudeText.toDoubleOrNull()
         if (latitude == null || longitude == null) { setStatus("Find a place or enter valid coordinates first."); return }
-        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")))
+        MapNavigator.openCoordinates(this, latitude, longitude)
+    }
+
+    private fun useLatestLocationForSafePlace(latitude: EditText, longitude: EditText) {
+        val current = session ?: return
+        val device = selectedDevice ?: return
+        setStatus("Loading the child’s latest check-in…")
+        Thread {
+            val location = ParentApi(usableParentSession(current)).latestLocation(device.id)
+            runOnUiThread {
+                if (location == null) setStatus("No child location is available yet. Enable visible location sharing on the child phone, then wait for a check-in.")
+                else {
+                    latitude.setText(location.latitude.toString())
+                    longitude.setText(location.longitude.toString())
+                    setStatus("Latest check-in inserted. Preview the point on the map, adjust the radius, then save the safe place.")
+                }
+            }
+        }.start()
     }
 
     private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
