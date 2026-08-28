@@ -200,7 +200,7 @@ class ParentModeActivity : android.app.Activity() {
             runOnUiThread {
                 setStatus(result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
                     ?: "Could not create pairing code. Confirm the updated Edge Function is deployed.")
-                if (result != null) refreshFamily()
+                // Do not refresh here: rebuilding the dashboard would erase the only display of the raw, hashed-on-server code.
             }
         }.start()
     }
