@@ -45,8 +45,8 @@ class SosAlertService : Service() {
     }
 
     private fun pollForAlerts() {
-        val session = ParentSessionStore(this).load() ?: return
         Thread {
+            val session = ParentSessionStore(this).ensureFresh() ?: return@Thread
             val api = ParentApi(session)
             api.recentSosAlerts().firstOrNull()?.let { latest ->
                 if (latest.id != prefs.getString("last_sos_id", null)) {

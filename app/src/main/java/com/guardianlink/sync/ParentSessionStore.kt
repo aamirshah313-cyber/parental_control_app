@@ -21,4 +21,12 @@ class ParentSessionStore(context: Context) {
         .apply()
 
     fun clear() = prefs.edit().clear().apply()
+
+    /** Call from a worker thread before a parent network request. */
+    fun ensureFresh(): ParentSession? {
+        val current = load() ?: return null
+        if (!SupabaseAuth.expiresWithin(current.accessToken)) return current
+        val refreshed = current.refreshToken?.let(SupabaseAuth::refresh) ?: return null
+        return current.copy(accessToken = refreshed.accessToken, refreshToken = refreshed.refreshToken).also(::save)
+    }
 }

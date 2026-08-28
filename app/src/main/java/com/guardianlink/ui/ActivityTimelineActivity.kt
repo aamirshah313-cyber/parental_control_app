@@ -32,7 +32,7 @@ class ActivityTimelineActivity : android.app.Activity() {
         val session = ParentSessionStore(this).load() ?: run { state.text = "Sign in again to view activity."; return }
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
         Thread {
-            val events = ParentApi(session).recentEvents(deviceId)
+            val events = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).recentEvents(deviceId)
             runOnUiThread {
                 if (events.isEmpty()) state.text = "No safety events recorded yet."
                 else {

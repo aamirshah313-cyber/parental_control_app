@@ -23,7 +23,7 @@ class AppInventoryReporter(private val context: Context) {
 
     private fun report(apps: List<ReportedAppPayload>): Boolean {
         val session = DeviceSessionStore(context)
-        return session.takeIf { it.isPaired() }?.let { SupabaseApi(it.deviceId!!, it.accessToken!!).upsertReportedApps(apps) } ?: false
+        return session.api()?.upsertReportedApps(apps) ?: false
     }
 
     private fun launchableApps(): List<ReportedAppPayload> {

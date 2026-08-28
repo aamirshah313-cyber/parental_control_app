@@ -11,7 +11,7 @@ class PolicySynchronizer(private val context: Context) {
     fun sync(): Boolean = runCatching {
         val session = DeviceSessionStore(context)
         if (!session.isPaired()) return true
-        val api = SupabaseApi(session.deviceId!!, session.accessToken!!)
+        val api = session.api() ?: return false
         api.touchLastSeen()
         AppInventoryReporter(context).reportIfDue()
         val store = PolicyStore(context)

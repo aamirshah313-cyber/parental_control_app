@@ -54,7 +54,7 @@ class LocationService : Service(), LocationListener {
         val session = DeviceSessionStore(this)
         if (!session.isPaired()) return
         Thread {
-            val api = SupabaseApi(session.deviceId!!, session.accessToken!!)
+            val api = session.api() ?: return@Thread
             api.postLocation(location.latitude, location.longitude, location.accuracy.takeIf { location.hasAccuracy() })
             api.postEvent("location_update", org.json.JSONObject().apply { put("accuracy_meters", location.accuracy) })
             reportSafePlaceTransitions(location, api)

@@ -18,4 +18,15 @@ class DeviceSessionStore(context: Context) {
     fun clear() = prefs.edit().clear().apply()
     fun markHandled(commandId: String) = prefs.edit().putString("last_handled_command_id", commandId).apply()
     fun isPaired(): Boolean = !deviceId.isNullOrBlank() && !accessToken.isNullOrBlank()
+    fun ensureFresh(): Boolean {
+        val token = accessToken ?: return false
+        if (!SupabaseAuth.expiresWithin(token)) return true
+        val refreshed = refreshToken?.let(SupabaseAuth::refresh) ?: return false
+        save(deviceId ?: return false, refreshed.accessToken, refreshed.refreshToken)
+        return true
+    }
+    fun api(): SupabaseApi? {
+        if (!isPaired() || !ensureFresh()) return null
+        return SupabaseApi(deviceId!!, accessToken!!)
+    }
 }

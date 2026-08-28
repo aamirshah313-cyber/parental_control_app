@@ -38,7 +38,7 @@ class ManageAppsActivity : android.app.Activity() {
         val session = ParentSessionStore(this).load() ?: run { status.text = "Sign in again to manage apps."; return }
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
         Thread {
-            val api = ParentApi(session)
+            val api = ParentApi(ParentSessionStore(this).ensureFresh() ?: session)
             val remotePolicy = api.activePolicy(deviceId)
             apps = api.reportedApps(deviceId)
             policy = remotePolicy?.policy ?: ChildPolicy()
@@ -84,7 +84,7 @@ class ManageAppsActivity : android.app.Activity() {
         status.text = "Sending app rules to child device…"
         Thread {
             val updated = transform(policy)
-            val ok = ParentApi(session).publishPolicy(deviceId, policyVersion, updated)
+            val ok = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).publishPolicy(deviceId, policyVersion, updated)
             runOnUiThread {
                 if (ok) { policy = updated.copy(version = policyVersion + 1); policyVersion += 1; status.text = "Rules sent. They apply when the child device next syncs."; render() }
                 else status.text = "Could not update app rules. Refresh the parent dashboard, then try again."

@@ -58,7 +58,7 @@ class LiveLocationActivity : android.app.Activity() {
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
         details.text = "Loading latest check-in…"
         Thread {
-            val location = ParentApi(session).latestLocation(deviceId)
+            val location = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).latestLocation(deviceId)
             runOnUiThread {
                 if (location == null) {
                     details.text = "No shared location yet. Enable location sharing on the child phone and start its visible location service."

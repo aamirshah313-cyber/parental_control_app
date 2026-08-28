@@ -216,7 +216,7 @@ class ParentModeActivity : android.app.Activity() {
         val current = session ?: return
         setStatus("Loading dashboard…")
         Thread {
-            val api = ParentApi(current)
+            val api = ParentApi(usableParentSession(current))
             val loadedFamily = api.families().firstOrNull()
             val devices = if (loadedFamily == null) emptyList() else api.devices(loadedFamily.id)
             runOnUiThread { family = loadedFamily; buildDashboard(devices); setStatus("Dashboard updated.") }
@@ -228,7 +228,7 @@ class ParentModeActivity : android.app.Activity() {
         if (name.isBlank()) { setStatus("Enter a family name."); return }
         setStatus("Creating family…")
         Thread {
-            val result = ParentApi(current).createFamily(name)
+            val result = ParentApi(usableParentSession(current)).createFamily(name)
             runOnUiThread { if (result == null) setStatus("Could not create family.") else { family = result; refreshFamily() } }
         }.start()
     }
@@ -247,7 +247,7 @@ class ParentModeActivity : android.app.Activity() {
         if (childName.isBlank()) { setStatus("Enter a child/device name."); return }
         setStatus("Creating pairing code…")
         Thread {
-            val result = ParentApi(current).createPairing(activeFamily.id, childName, validity)
+            val result = ParentApi(usableParentSession(current)).createPairing(activeFamily.id, childName, validity)
             runOnUiThread {
                 val message = result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
                     ?: "Could not create pairing code. Confirm the updated Edge Function is deployed."
@@ -268,7 +268,7 @@ class ParentModeActivity : android.app.Activity() {
         selectedDevice = device
         setStatus("Loading ${device.displayName}'s policy…")
         Thread {
-            val remote = ParentApi(current).activePolicy(device.id)
+            val remote = ParentApi(usableParentSession(current)).activePolicy(device.id)
             runOnUiThread { selectedVersion = remote?.version ?: 0; selectedPolicy = remote?.policy ?: ChildPolicy(); refreshFamily() }
         }.start()
     }
@@ -278,7 +278,7 @@ class ParentModeActivity : android.app.Activity() {
         val device = selectedDevice ?: return
         setStatus("Sending $command command…")
         Thread {
-            val ok = ParentApi(current).sendCommand(device.id, command, expiry, scope)
+            val ok = ParentApi(usableParentSession(current)).sendCommand(device.id, command, expiry, scope)
             runOnUiThread { setStatus(if (ok) "Command sent. The child phone applies it when it next syncs." else "Could not send command.") }
         }.start()
     }
@@ -288,7 +288,7 @@ class ParentModeActivity : android.app.Activity() {
         val device = selectedDevice ?: return
         setStatus("Checking ${device.displayName}'s sync status…")
         Thread {
-            val latest = ParentApi(current).latestCommandStatus(device.id)
+            val latest = ParentApi(usableParentSession(current)).latestCommandStatus(device.id)
             runOnUiThread {
                 val lastSeen = device.lastSeenAt?.replace('T', ' ')?.substringBefore('.') ?: "not reported yet"
                 setStatus(
@@ -306,7 +306,7 @@ class ParentModeActivity : android.app.Activity() {
         val device = selectedDevice ?: return
         setStatus("Publishing rules…")
         Thread {
-            val ok = ParentApi(current).publishPolicy(device.id, selectedVersion, policy)
+            val ok = ParentApi(usableParentSession(current)).publishPolicy(device.id, selectedVersion, policy)
             runOnUiThread {
                 if (ok) { selectedVersion += 1; selectedPolicy = policy.copy(version = selectedVersion); setStatus("Rules sent to ${device.displayName}.") }
                 else setStatus("Could not publish rules. Try refreshing the device and try again.")
@@ -319,7 +319,7 @@ class ParentModeActivity : android.app.Activity() {
         val device = selectedDevice ?: return
         setStatus("Loading latest location…")
         Thread {
-            val location = ParentApi(current).latestLocation(device.id)
+            val location = ParentApi(usableParentSession(current)).latestLocation(device.id)
             runOnUiThread {
                 setStatus(location?.let { "Latest location: ${it.latitude}, ${it.longitude}\nAccuracy: ${it.accuracyMeters?.let { meters -> "${meters.toInt()} m" } ?: "unknown"}\nRecorded: ${it.recordedAt}" }
                     ?: "No shared location yet. Enable location sharing and grant location permission on the child phone.")
@@ -352,6 +352,7 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
+    private fun usableParentSession(fallback: ParentSession) = sessionStore.ensureFresh() ?: fallback
     private fun title(text: String) = TextView(this).apply {
         this.text = text; textSize = 25f; gravity = Gravity.CENTER_HORIZONTAL; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
         layoutParams = layoutParams(0, 12)

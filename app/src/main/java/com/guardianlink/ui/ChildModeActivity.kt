@@ -127,9 +127,9 @@ class ChildModeActivity : android.app.Activity() {
         if (!session.isPaired()) { status.text = "Pair this child phone before sending SOS."; return }
         status.text = "Sending SOS alert…"
         Thread {
-            val sent = com.guardianlink.sync.SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("sos", org.json.JSONObject().apply {
+            val sent = session.api()?.postEvent("sos", org.json.JSONObject().apply {
                 put("message", "Child pressed SOS")
-            })
+            }) == true
             runOnUiThread { status.text = if (sent) "SOS sent. The parent alarm should sound within 5 seconds." else "SOS could not be sent. Check the internet connection and Supabase SOS migration." }
         }.start()
     }
