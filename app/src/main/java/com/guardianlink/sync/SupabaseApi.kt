@@ -42,13 +42,13 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         patch("/rest/v1/devices?id=eq.$deviceId", JSONObject().apply { put("last_seen_at", java.time.Instant.now().toString()) })
     }
 
-    fun postEvent(type: String, details: JSONObject = JSONObject()) {
-        if (!enabled) return
-        post("/rest/v1/device_events", JSONObject().apply {
+    fun postEvent(type: String, details: JSONObject = JSONObject()): Boolean {
+        if (!enabled) return false
+        return request("POST", "/rest/v1/device_events", JSONObject().apply {
             put("device_id", deviceId)
             put("event_type", type)
             put("details", details)
-        })
+        }.toString()) != null
     }
 
     fun postLocation(latitude: Double, longitude: Double, accuracyMeters: Float?) {

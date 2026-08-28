@@ -20,6 +20,7 @@ import com.guardianlink.sync.PolicySynchronizer
 class ChildModeActivity : android.app.Activity() {
     private lateinit var status: TextView
     private val setupPrefs by lazy { getSharedPreferences("guardian_child_setup", MODE_PRIVATE) }
+    private var pairingInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,23 +30,38 @@ class ChildModeActivity : android.app.Activity() {
         root.addView(TextView(this).apply { text = "Step 1 — Pair this child phone" })
         val pairingCode = EditText(this).apply { hint = "Paste one-time pairing code"; setSingleLine() }
         root.addView(pairingCode)
-        root.addView(Button(this).apply {
+        val pairButton = Button(this).apply {
             text = "Pair this device"
             setOnClickListener {
+                val existingSession = DeviceSessionStore(this@ChildModeActivity)
+                if (existingSession.isPaired()) {
+                    status.text = "This child device is already paired. Syncing rules…"
+                    Thread { PolicySynchronizer(this@ChildModeActivity).sync() }.start()
+                    return@setOnClickListener
+                }
+                if (pairingInProgress) return@setOnClickListener
+                pairingInProgress = true
+                isEnabled = false
                 status.text = "Pairing…"
                 Thread {
                     val result = PairingClient().claim(pairingCode.text.toString(), android.os.Build.MODEL)
                     runOnUiThread {
-                        if (result == null) status.text = "Pairing failed. Check the code and internet connection."
+                        pairingInProgress = false
+                        if (result == null) {
+                            isEnabled = true
+                            status.text = "Pairing failed. The code may be expired, already used, or the internet connection is unavailable."
+                        }
                         else {
                             DeviceSessionStore(this@ChildModeActivity).save(result.deviceId, result.accessToken, result.refreshToken)
+                            text = "This device is paired"
                             status.text = "Paired. Continue with the recommended setup steps below."
                             Thread { PolicySynchronizer(this@ChildModeActivity).sync() }.start()
                         }
                     }
                 }.start()
             }
-        })
+        }
+        root.addView(pairButton)
 
         root.addView(TextView(this).apply { text = "\nStep 2 — Recommended protection settings (no permissions requested)" })
         root.addView(TextView(this).apply { text = "YouTube Shorts blocked in the supervised browser • bedtime 21:00–07:00 • new apps require parent approval • location sharing off by default" })
@@ -105,10 +121,10 @@ class ChildModeActivity : android.app.Activity() {
         if (!session.isPaired()) { status.text = "Pair this child phone before sending SOS."; return }
         status.text = "Sending SOS alert…"
         Thread {
-            com.guardianlink.sync.SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("sos", org.json.JSONObject().apply {
+            val sent = com.guardianlink.sync.SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("sos", org.json.JSONObject().apply {
                 put("message", "Child pressed SOS")
             })
-            runOnUiThread { status.text = "SOS sent. The parent alarm will sound when its SOS receiver syncs." }
+            runOnUiThread { status.text = if (sent) "SOS sent. The parent alarm should sound within 5 seconds." else "SOS could not be sent. Check the internet connection and Supabase SOS migration." }
         }.start()
     }
 }

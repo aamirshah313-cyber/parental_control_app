@@ -86,9 +86,11 @@ class ParentModeActivity : android.app.Activity() {
             addStatus()
             return
         }
+        // Start while this activity is visible; Android permits the foreground receiver to continue afterward.
+        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
         content.addView(note("Family: ${activeFamily.name}"))
         content.addView(button("Refresh devices") { refreshFamily() })
-        content.addView(button("Enable SOS receiver") { startForegroundService(android.content.Intent(this, SosAlertService::class.java)); setStatus("SOS receiver enabled. It checks for alerts every 15 seconds.") })
+        content.addView(button("Enable SOS receiver") { startForegroundService(android.content.Intent(this, SosAlertService::class.java)); setStatus("SOS receiver enabled. It checks for alerts every 5 seconds.") })
         content.addView(button("Stop SOS alarm / receiver") { SosAlertService.stopAlarm(this); setStatus("SOS receiver stopped.") })
         content.addView(button("Sign out") { signOut() })
 
