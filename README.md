@@ -24,6 +24,7 @@ Android-first parental-control app with cloud-backed parent controls, offline ch
 
 1. Run [`supabase/schema.sql`](supabase/schema.sql) in the Supabase SQL Editor if the base schema is not already installed.
 2. Run [`supabase/migrations/20260828_parent_dashboard.sql`](supabase/migrations/20260828_parent_dashboard.sql) after the base schema. It adds location storage, new event types, and the limited child last-seen permission.
+   If you had already run an earlier copy of that migration, also run [`supabase/migrations/20260828_sos_alert.sql`](supabase/migrations/20260828_sos_alert.sql).
 3. Deploy the pairing functions, including the new validity chooser:
 
    ```powershell
