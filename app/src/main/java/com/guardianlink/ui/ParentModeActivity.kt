@@ -1,10 +1,15 @@
 package com.guardianlink.ui
 
 import android.os.Bundle
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.InputType
 import android.view.Gravity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.location.Geocoder
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
@@ -48,8 +53,15 @@ class ParentModeActivity : android.app.Activity() {
 
     private fun buildScreen() {
         val padding = (20 * resources.displayMetrics.density).toInt()
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(padding, padding, padding, padding) }
-        setContentView(ScrollView(this).apply { addView(content) })
+        content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
+            setBackgroundColor(Color.rgb(246, 248, 252))
+        }
+        setContentView(ScrollView(this).apply {
+            setBackgroundColor(Color.rgb(246, 248, 252))
+            addView(content, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT))
+        })
         if (session == null) buildSignIn() else buildDashboard(emptyList())
     }
 
@@ -167,14 +179,19 @@ class ParentModeActivity : android.app.Activity() {
         })
         content.addView(section("Latest shared location"))
         content.addView(button("Load latest location") { loadLocation() })
+        content.addView(button("View latest location on map") { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) })
 
         content.addView(section("Safe places"))
         content.addView(note(selectedPolicy.safePlaces.takeIf { it.isNotEmpty() }?.joinToString("\n") { "${it.name}: ${it.radiusMeters} m" } ?: "No safe places configured."))
+        val safeSearch = field("Search a place, for example Beaconhouse School Karachi")
         val safeName = field("Safe-place name, for example School")
         val safeLatitude = field("Latitude, for example 24.8607", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
         val safeLongitude = field("Longitude, for example 67.0011", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
         val safeRadius = field("Radius in metres (50–5000)", InputType.TYPE_CLASS_NUMBER).apply { setText("150") }
+        content.addView(safeSearch)
+        content.addView(button("Find place coordinates") { findPlace(safeSearch.text.toString(), safeName, safeLatitude, safeLongitude) })
         listOf(safeName, safeLatitude, safeLongitude, safeRadius).forEach(content::addView)
+        content.addView(button("Preview safe place on map") { openMapPreview(safeLatitude.text.toString(), safeLongitude.text.toString()) })
         content.addView(button("Add safe place") {
             val place = runCatching {
                 SafePlace(
@@ -279,12 +296,60 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
+    private fun findPlace(query: String, name: EditText, latitude: EditText, longitude: EditText) {
+        if (query.isBlank()) { setStatus("Enter a place name to search."); return }
+        setStatus("Searching for $query…")
+        Thread {
+            val result = runCatching { Geocoder(this).getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
+            runOnUiThread {
+                if (result == null) setStatus("Place not found. Try a more specific name or enter coordinates manually.")
+                else {
+                    name.setText(result.featureName ?: query)
+                    latitude.setText(result.latitude.toString())
+                    longitude.setText(result.longitude.toString())
+                    setStatus("Place found. Review the point on the map before saving the safe place.")
+                }
+            }
+        }.start()
+    }
+
+    private fun openMapPreview(latitudeText: String, longitudeText: String) {
+        val latitude = latitudeText.toDoubleOrNull()
+        val longitude = longitudeText.toDoubleOrNull()
+        if (latitude == null || longitude == null) { setStatus("Find a place or enter valid coordinates first."); return }
+        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")))
+    }
+
     private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
-    private fun title(text: String) = TextView(this).apply { this.text = text; textSize = 24f; gravity = Gravity.CENTER_HORIZONTAL }
-    private fun section(text: String) = TextView(this).apply { this.text = "\n$text"; textSize = 18f }
-    private fun note(text: String) = TextView(this).apply { this.text = text }
-    private fun field(hint: String, inputType: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply { this.hint = hint; this.inputType = inputType }
-    private fun button(text: String, action: () -> Unit) = Button(this).apply { this.text = text; setOnClickListener { action() } }
-    private fun addStatus() { status = TextView(this); content.addView(status) }
+    private fun title(text: String) = TextView(this).apply {
+        this.text = text; textSize = 25f; gravity = Gravity.CENTER_HORIZONTAL; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
+        layoutParams = layoutParams(0, 12)
+    }
+    private fun section(text: String) = TextView(this).apply {
+        this.text = text; textSize = 18f; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
+        layoutParams = layoutParams(20, 8)
+    }
+    private fun note(text: String) = TextView(this).apply {
+        this.text = text; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(12), dp(14), dp(12))
+        background = rounded(Color.WHITE, Color.rgb(224, 229, 238)); layoutParams = layoutParams(0, 10)
+    }
+    private fun field(hint: String, inputType: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
+        this.hint = hint; this.inputType = inputType; textSize = 15f; setPadding(dp(14), dp(4), dp(14), dp(4))
+        background = rounded(Color.WHITE, Color.rgb(196, 208, 225)); layoutParams = layoutParams(0, 8)
+    }
+    private fun button(text: String, action: () -> Unit) = Button(this).apply {
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214))
+        minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
+    }
+    private fun addStatus() {
+        status = TextView(this).apply {
+            textSize = 14f; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244)); layoutParams = layoutParams(16, 0)
+        }
+        content.addView(status)
+    }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun layoutParams(top: Int, bottom: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, dp(bottom)) }
+    private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(14).toFloat(); setStroke(dp(1), stroke) }
     private fun setStatus(text: String) { if (::status.isInitialized) status.text = text }
 }

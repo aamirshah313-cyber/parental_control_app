@@ -5,10 +5,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import com.guardianlink.enforcement.LocationService
 import com.guardianlink.enforcement.ProtectionService
@@ -24,8 +29,8 @@ class ChildModeActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(40, 40, 40, 40) }
-        root.addView(TextView(this).apply { text = "Child device setup"; textSize = 24f })
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(Color.rgb(246, 248, 252)) }
+        root.addView(TextView(this).apply { text = "Child device setup"; textSize = 25f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); gravity = Gravity.CENTER_HORIZONTAL })
 
         root.addView(TextView(this).apply { text = "Step 1 — Pair this child phone" })
         val pairingCode = EditText(this).apply { hint = "Paste one-time pairing code"; setSingleLine() }
@@ -89,7 +94,8 @@ class ChildModeActivity : android.app.Activity() {
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         status = TextView(this)
         root.addView(status)
-        setContentView(root)
+        styleControls(root)
+        setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(root) })
     }
 
     private fun completeStepFive() {
@@ -127,4 +133,22 @@ class ChildModeActivity : android.app.Activity() {
             runOnUiThread { status.text = if (sent) "SOS sent. The parent alarm should sound within 5 seconds." else "SOS could not be sent. Check the internet connection and Supabase SOS migration." }
         }.start()
     }
+
+    private fun styleControls(root: LinearLayout) {
+        for (index in 0 until root.childCount) {
+            when (val child = root.getChildAt(index)) {
+                is Button -> child.apply {
+                    isAllCaps = false; textSize = 15f; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)); minHeight = dp(48)
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }
+                }
+                is EditText -> child.apply {
+                    setPadding(dp(14), dp(4), dp(14), dp(4)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(196, 208, 225)) }
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, dp(10)) }
+                }
+                is TextView -> if (child !== status && child.text.toString().startsWith("\nStep")) child.apply { setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD; textSize = 17f; setPadding(0, dp(12), 0, dp(4)) }
+            }
+        }
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

@@ -1,6 +1,8 @@
 package com.guardianlink.sync
 
 import android.content.Context
+import android.content.Intent
+import com.guardianlink.enforcement.LocationService
 import com.guardianlink.policy.PolicyStore
 
 /** Downloads only the active policy and latest command. Local enforcement remains active if this fails. */
@@ -12,6 +14,7 @@ class PolicySynchronizer(private val context: Context) {
         api.touchLastSeen()
         val store = PolicyStore(context)
         api.fetchActivePolicy()?.let { raw -> store.saveFromCloudJson(raw) }
+        if (!store.load().locationEnabled) context.stopService(Intent(context, LocationService::class.java))
         api.fetchLatestCommand()?.takeIf { it.id != session.lastHandledCommandId }?.let { command ->
             when {
                 command.expiresAtEpochMs != null && command.expiresAtEpochMs < System.currentTimeMillis() -> api.acknowledge(command.id, "expired")
