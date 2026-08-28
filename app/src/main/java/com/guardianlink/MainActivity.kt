@@ -19,7 +19,7 @@ class MainActivity : android.app.Activity() {
             setPadding(padding, padding, padding, padding)
         }
         root.addView(TextView(this).apply {
-            text = "Guardian Link\nParental controls that work offline"
+            text = "${getString(R.string.app_name)}\nParental controls that work offline"
             textSize = 24f
             gravity = Gravity.CENTER
         })

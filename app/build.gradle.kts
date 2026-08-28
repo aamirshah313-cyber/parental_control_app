@@ -10,6 +10,9 @@ val localProperties = Properties().apply {
 }
 val supabaseUrl = localProperties.getProperty("SUPABASE_URL", "")
 val supabaseAnonKey = localProperties.getProperty("SUPABASE_ANON_KEY", "")
+val productName = localProperties.getProperty("PRODUCT_NAME", "Guardian Link")
+val brandPrimary = localProperties.getProperty("BRAND_PRIMARY_COLOR", "#1366D6")
+val appId = localProperties.getProperty("APPLICATION_ID", "com.guardianlink")
 
 android {
     namespace = "com.guardianlink"
@@ -17,18 +20,21 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.guardianlink"
+        applicationId = appId
         minSdk = 26
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.3.3"
+        versionCode = 7
+        versionName = "0.4.0"
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
+        resValue("string", "app_name", productName)
+        resValue("color", "brand_primary", brandPrimary)
     }
 
     buildFeatures {
         buildConfig = true
+        resValues = true
     }
 
     compileOptions {

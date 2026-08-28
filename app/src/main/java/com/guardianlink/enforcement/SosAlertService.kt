@@ -19,6 +19,7 @@ import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
 import com.guardianlink.ui.ParentModeActivity
 import com.guardianlink.ui.SosAlertActivity
+import com.guardianlink.R
 import java.util.Locale
 
 /** Parent-side opt-in receiver for SOS alarms and post-install parent-approval requests. */
@@ -41,7 +42,7 @@ class SosAlertService : Service() {
         createChannel()
         startForeground(1003, android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("Guardian Link SOS receiver is active")
+            .setContentTitle("${getString(R.string.app_name)} SOS receiver is active")
             .setContentText("SOS alarms and app approval requests are monitored")
             .setOngoing(true)
             .build())
@@ -74,7 +75,7 @@ class SosAlertService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("App approval requested")
             .setContentText("Child installed: $appName")
-            .setStyle(android.app.Notification.BigTextStyle().bigText("A child app is waiting for approval: $appName ($packageName). Open Guardian Link to allow or block it."))
+            .setStyle(android.app.Notification.BigTextStyle().bigText("A child app is waiting for approval: $appName ($packageName). Open ${getString(R.string.app_name)} to allow or block it."))
             .setContentIntent(openDashboard)
             .setAutoCancel(true)
             .build())

@@ -11,6 +11,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.IBinder
 import com.guardianlink.policy.PolicyStore
+import com.guardianlink.R
 import com.guardianlink.sync.DeviceSessionStore
 import com.guardianlink.sync.SupabaseApi
 
@@ -25,7 +26,7 @@ class LocationService : Service(), LocationListener {
         createChannel()
         startForeground(1002, android.app.Notification.Builder(this, "location_sharing")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("Guardian Link location sharing is active")
+            .setContentTitle("${getString(R.string.app_name)} location sharing is active")
             .setContentText("Location is shared with the parent family when enabled by policy")
             .setOngoing(true)
             .build())

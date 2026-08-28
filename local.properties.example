@@ -1,0 +1,9 @@
+# Copy to local.properties and insert values for YOUR Supabase project.
+# local.properties is ignored by Git and must never be committed.
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_ANON_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+
+# Optional white-label settings. PRODUCT_NAME becomes the Android launcher label.
+PRODUCT_NAME=Guardian Link
+BRAND_PRIMARY_COLOR=#1366D6
+APPLICATION_ID=com.yourcompany.familysafety

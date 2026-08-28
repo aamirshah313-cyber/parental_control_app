@@ -27,6 +27,7 @@ import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSession
 import com.guardianlink.sync.ParentSessionStore
 import com.guardianlink.enforcement.SosAlertService
+import com.guardianlink.R
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -68,7 +69,7 @@ class ParentModeActivity : android.app.Activity() {
     private fun buildSignIn() {
         content.removeAllViews()
         content.addView(title("Parent dashboard"))
-        content.addView(note("Sign in with your Supabase parent account. Child-device sessions cannot open this screen."))
+        content.addView(note("Sign in or create a parent account. Each parent account can access only its own family data."))
         val email = field("Parent email", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         val password = field("Password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         content.addView(email); content.addView(password)
@@ -82,12 +83,28 @@ class ParentModeActivity : android.app.Activity() {
                 }
             }.start()
         })
+        content.addView(button("Create parent account") {
+            val emailText = email.text.toString().trim()
+            val passwordText = password.text.toString()
+            if (emailText.isBlank() || passwordText.length < 8) { setStatus("Enter an email and a password of at least 8 characters."); return@button }
+            setStatus("Creating parent account…")
+            Thread {
+                val result = ParentApi.signUp(emailText, passwordText)
+                runOnUiThread {
+                    when {
+                        result == null -> setStatus("Account creation failed. Check Supabase configuration or use a different email.")
+                        result.session != null -> { session = result.session; sessionStore.save(result.session); refreshFamily() }
+                        result.confirmationRequired -> setStatus("Account created. Confirm the email sent by Supabase, then return and sign in.")
+                    }
+                }
+            }.start()
+        })
         addStatus()
     }
 
     private fun buildDashboard(devices: List<DeviceRecord>) {
         content.removeAllViews()
-        content.addView(title("Guardian Link — Parent"))
+        content.addView(title("${getString(R.string.app_name)} — Parent"))
         val activeFamily = family
         if (activeFamily == null) {
             content.addView(note("No family was found for this account. Create one before pairing a child phone."))
@@ -117,7 +134,7 @@ class ParentModeActivity : android.app.Activity() {
             val code = lastPairingCode
             if (code == null) setStatus("Generate a pairing code first.")
             else {
-                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Guardian Link pairing code", code))
+                getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("${getString(R.string.app_name)} pairing code", code))
                 setStatus("Pairing code copied. Paste it on the child phone.")
             }
         }.apply { isEnabled = lastPairingCode != null }

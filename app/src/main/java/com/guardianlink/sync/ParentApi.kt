@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 data class FamilyRecord(val id: String, val name: String)
 data class DeviceRecord(val id: String, val displayName: String, val lastSeenAt: String?)
 data class PairingCode(val code: String, val expiresInSeconds: Int)
+data class ParentSignUpResult(val session: ParentSession?, val confirmationRequired: Boolean)
 data class LocationRecord(val latitude: Double, val longitude: Double, val accuracyMeters: Float?, val recordedAt: String)
 data class VersionedPolicy(val version: Int, val policy: ChildPolicy)
 data class SosAlert(val id: String, val deviceId: String, val message: String, val createdAt: String)
@@ -37,6 +38,23 @@ class ParentApi(private val session: ParentSession) {
             }.toString()) ?: error("Sign-in failed")
             val json = JSONObject(result)
             ParentSession(json.getJSONObject("user").getString("id"), json.getString("access_token"), json.optString("refresh_token").ifBlank { null })
+        }.getOrNull()
+
+        /** Creates a generic parent account. Supabase email-confirmation settings decide whether it signs in immediately. */
+        fun signUp(email: String, password: String): ParentSignUpResult? = runCatching {
+            val baseUrl = BuildConfig.SUPABASE_URL.trimEnd('/')
+            val apiKey = BuildConfig.SUPABASE_ANON_KEY
+            require(baseUrl.isNotBlank() && apiKey.isNotBlank()) { "Supabase is not configured" }
+            val result = requestRaw("POST", "$baseUrl/auth/v1/signup", apiKey, null, JSONObject().apply {
+                put("email", email.trim())
+                put("password", password)
+            }.toString()) ?: error("Sign-up failed")
+            val json = JSONObject(result)
+            val access = json.optString("access_token")
+            val session = access.takeIf { it.isNotBlank() }?.let {
+                ParentSession(json.getJSONObject("user").getString("id"), it, json.optString("refresh_token").ifBlank { null })
+            }
+            ParentSignUpResult(session, session == null)
         }.getOrNull()
 
         private fun requestRaw(method: String, url: String, apiKey: String, token: String?, body: String?): String? = runCatching {

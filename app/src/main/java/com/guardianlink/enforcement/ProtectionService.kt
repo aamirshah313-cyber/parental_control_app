@@ -35,7 +35,7 @@ class ProtectionService : Service() {
         createChannel()
         startForeground(1001, android.app.Notification.Builder(this, "protection")
             .setSmallIcon(android.R.drawable.ic_lock_lock)
-            .setContentTitle("Guardian Link protection is active")
+            .setContentTitle("${getString(R.string.app_name)} protection is active")
             .setContentText("Time rules and app limits are being enforced")
             .setOngoing(true)
             .build())

@@ -2,6 +2,7 @@ package com.guardianlink.policy
 
 import com.guardianlink.model.ChildPolicy
 import com.guardianlink.model.EnforcementDecision
+import com.guardianlink.BuildConfig
 import java.time.LocalDateTime
 
 class PolicyEngine {
@@ -43,7 +44,7 @@ class PolicyEngine {
     }
 
     /** Normal app mode cannot safely lock the launcher, system UI, emergency dialer, or Guardian Link itself. */
-    private fun isEssentialPackage(packageName: String): Boolean = packageName == "com.guardianlink" || packageName in setOf(
+    private fun isEssentialPackage(packageName: String): Boolean = packageName == BuildConfig.APPLICATION_ID || packageName in setOf(
         "android", "com.android.systemui", "com.android.settings", "com.android.permissioncontroller",
         "com.google.android.permissioncontroller", "com.android.packageinstaller", "com.google.android.packageinstaller",
         "com.android.dialer", "com.google.android.dialer"

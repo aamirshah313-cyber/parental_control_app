@@ -20,6 +20,7 @@ import com.guardianlink.enforcement.ProtectionService
 import com.guardianlink.sync.DeviceSessionStore
 import com.guardianlink.sync.PairingClient
 import com.guardianlink.sync.PolicySynchronizer
+import com.guardianlink.R
 
 /** Five-step child onboarding. Runtime Android permissions are deliberately deferred to step 5. */
 class ChildModeActivity : android.app.Activity() {
@@ -108,7 +109,7 @@ class ChildModeActivity : android.app.Activity() {
         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         Thread { PolicySynchronizer(this).sync() }.start()
         startForegroundService(Intent(this, ProtectionService::class.java))
-        status.text = "Enable Usage Access for Guardian Link, then return here. Protection is starting."
+        status.text = "Enable Usage Access for ${getString(R.string.app_name)}, then return here. Protection is starting."
     }
 
     private fun startLocationSharingAfterSetup() {
