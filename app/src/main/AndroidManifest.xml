@@ -35,6 +35,11 @@
             android:foregroundServiceType="location"
             android:exported="false" />
 
+        <service
+            android:name=".enforcement.SosAlertService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
         <receiver android:name=".enforcement.PackageChangedReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_ADDED" />

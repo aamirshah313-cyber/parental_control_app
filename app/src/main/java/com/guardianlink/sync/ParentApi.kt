@@ -15,6 +15,7 @@ data class DeviceRecord(val id: String, val displayName: String, val lastSeenAt:
 data class PairingCode(val code: String, val expiresInSeconds: Int)
 data class LocationRecord(val latitude: Double, val longitude: Double, val accuracyMeters: Float?, val recordedAt: String)
 data class VersionedPolicy(val version: Int, val policy: ChildPolicy)
+data class SosAlert(val id: String, val deviceId: String, val message: String, val createdAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -95,6 +96,13 @@ class ParentApi(private val session: ParentSession) {
         val accuracy = row.optDouble("accuracy_meters", Double.NaN)
         return LocationRecord(row.getDouble("latitude"), row.getDouble("longitude"), accuracy.takeIf { !it.isNaN() }?.toFloat(), row.getString("recorded_at"))
     }
+
+    fun recentSosAlerts(): List<SosAlert> = get("/rest/v1/device_events?event_type=eq.sos&select=id,device_id,details,created_at&order=created_at.desc&limit=10")?.let { rows ->
+        (0 until rows.length()).map { index ->
+            val row = rows.getJSONObject(index)
+            SosAlert(row.getString("id"), row.getString("device_id"), row.optJSONObject("details")?.optString("message", "Emergency SOS") ?: "Emergency SOS", row.getString("created_at"))
+        }
+    } ?: emptyList()
 
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
     private fun post(path: String, body: JSONObject, returnRepresentation: Boolean = false): JSONArray? = request("POST", path, body.toString(), returnRepresentation)?.takeIf { it.isNotBlank() }?.let(::JSONArray) ?: if (!returnRepresentation) JSONArray() else null

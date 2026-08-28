@@ -66,6 +66,10 @@ class ChildModeActivity : android.app.Activity() {
             text = "Start visible location sharing"
             setOnClickListener { startLocationSharingAfterSetup() }
         })
+        root.addView(Button(this).apply {
+            text = "SOS — alert parent"
+            setOnClickListener { sendSos() }
+        })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         status = TextView(this)
         root.addView(status)
@@ -94,5 +98,17 @@ class ChildModeActivity : android.app.Activity() {
         }
         startForegroundService(Intent(this, LocationService::class.java))
         status.text = "Visible location sharing started if the parent policy permits it."
+    }
+
+    private fun sendSos() {
+        val session = DeviceSessionStore(this)
+        if (!session.isPaired()) { status.text = "Pair this child phone before sending SOS."; return }
+        status.text = "Sending SOS alert…"
+        Thread {
+            com.guardianlink.sync.SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("sos", org.json.JSONObject().apply {
+                put("message", "Child pressed SOS")
+            })
+            runOnUiThread { status.text = "SOS sent. The parent alarm will sound when its SOS receiver syncs." }
+        }.start()
     }
 }

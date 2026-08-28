@@ -12,6 +12,7 @@ Android-first parental-control app with cloud-backed parent controls, offline ch
 - Standard-mode new-app detection: a newly installed app is locally blocked until a parent publishes an approval.
 - Visible, opt-in child location sharing with coordinates, accuracy, and recorded time in the Parent Dashboard.
 - Safe places (name, coordinates, radius) evaluated locally on the child phone, with only enter/leave events uploaded.
+- One-tap child SOS alert; the parent can enable a visible SOS receiver that sounds an alarm when it detects the alert.
 
 ## Build
 
@@ -41,6 +42,7 @@ Android-first parental-control app with cloud-backed parent controls, offline ch
 - The app does not claim to cut all device internet traffic yet. A transparent VPN/DNS module is the next layer for a stronger device-wide internet pause and domain filter.
 - Blocking `/shorts/` is reliable in the supervised browser. Selective Shorts filtering inside the official YouTube app is not guaranteed.
 - Location is deliberately not hidden: it has a persistent Android foreground-service notification and requires the child phone's permission.
+- SOS needs both phones online and the parent SOS receiver enabled. It checks every 15 seconds without FCM; it is an app alarm, not an automatic emergency phone call.
 - Do not collect private messages, keystrokes, camera, microphone, or hidden screenshots.
 
 ## Remaining advanced modules

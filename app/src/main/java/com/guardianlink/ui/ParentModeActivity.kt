@@ -19,6 +19,7 @@ import com.guardianlink.sync.FamilyRecord
 import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSession
 import com.guardianlink.sync.ParentSessionStore
+import com.guardianlink.enforcement.SosAlertService
 import java.time.DayOfWeek
 import java.time.LocalTime
 
@@ -82,6 +83,8 @@ class ParentModeActivity : android.app.Activity() {
         }
         content.addView(note("Family: ${activeFamily.name}"))
         content.addView(button("Refresh devices") { refreshFamily() })
+        content.addView(button("Enable SOS receiver") { startForegroundService(android.content.Intent(this, SosAlertService::class.java)); setStatus("SOS receiver enabled. It checks for alerts every 15 seconds.") })
+        content.addView(button("Stop SOS alarm / receiver") { SosAlertService.stopAlarm(this); setStatus("SOS receiver stopped.") })
         content.addView(button("Sign out") { signOut() })
 
         content.addView(section("Pair a child phone"))
@@ -89,9 +92,11 @@ class ParentModeActivity : android.app.Activity() {
         val durations = listOf("10 minutes" to 600, "30 minutes" to 1_800, "1 hour" to 3_600, "24 hours" to 86_400)
         val durationPicker = Spinner(this).apply { adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, durations.map { it.first }) }
         content.addView(childName); content.addView(durationPicker)
+        val pairingCodeOutput = TextView(this)
         content.addView(button("Generate one-time pairing code") {
-            createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second)
+            createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, pairingCodeOutput)
         })
+        content.addView(pairingCodeOutput)
 
         content.addView(section("Child devices"))
         if (devices.isEmpty()) content.addView(note("No child device paired yet."))
@@ -190,7 +195,7 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun createPairing(childName: String, validity: Int) {
+    private fun createPairing(childName: String, validity: Int, output: TextView) {
         val current = session ?: return
         val activeFamily = family ?: return
         if (childName.isBlank()) { setStatus("Enter a child/device name."); return }
@@ -198,8 +203,10 @@ class ParentModeActivity : android.app.Activity() {
         Thread {
             val result = ParentApi(current).createPairing(activeFamily.id, childName, validity)
             runOnUiThread {
-                setStatus(result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
-                    ?: "Could not create pairing code. Confirm the updated Edge Function is deployed.")
+                val message = result?.let { "Pairing code (single-use): ${it.code}\nValid for ${it.expiresInSeconds / 60} minutes. Paste it on the child phone." }
+                    ?: "Could not create pairing code. Confirm the updated Edge Function is deployed."
+                output.text = message
+                setStatus(message)
                 // Do not refresh here: rebuilding the dashboard would erase the only display of the raw, hashed-on-server code.
             }
         }.start()
