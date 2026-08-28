@@ -17,6 +17,7 @@ data class LocationRecord(val latitude: Double, val longitude: Double, val accur
 data class VersionedPolicy(val version: Int, val policy: ChildPolicy)
 data class SosAlert(val id: String, val deviceId: String, val message: String, val createdAt: String)
 data class DeviceEvent(val eventType: String, val details: JSONObject, val createdAt: String)
+data class CommandDeliveryStatus(val commandType: String, val sentAt: String, val acknowledgement: String?, val acknowledgedAt: String?)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -75,6 +76,22 @@ class ParentApi(private val session: ParentSession) {
         put("device_id", deviceId); put("command_type", command); put("scope", "managed_apps")
         expiresAtEpochMs?.let { put("expires_at", java.time.Instant.ofEpochMilli(it).toString()) }
     }) != null
+
+    /** Latest command plus the child's explicit acknowledgement, if the child has synced. */
+    fun latestCommandStatus(deviceId: String): CommandDeliveryStatus? {
+        val commands = get("/rest/v1/parent_commands?device_id=eq.$deviceId&select=id,command_type,created_at&order=created_at.desc&limit=1") ?: return null
+        if (commands.length() == 0) return null
+        val command = commands.getJSONObject(0)
+        val commandId = command.getString("id")
+        val acknowledgements = get("/rest/v1/device_acknowledgements?command_id=eq.$commandId&select=status,created_at&order=created_at.desc&limit=1")
+        val acknowledgement = acknowledgements?.takeIf { it.length() > 0 }?.getJSONObject(0)
+        return CommandDeliveryStatus(
+            command.getString("command_type"),
+            command.getString("created_at"),
+            acknowledgement?.getString("status"),
+            acknowledgement?.getString("created_at")
+        )
+    }
 
     fun activePolicy(deviceId: String): VersionedPolicy? {
         val rows = get("/rest/v1/device_policies?device_id=eq.$deviceId&active=eq.true&select=version,policy&order=version.desc&limit=1") ?: return null

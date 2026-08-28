@@ -142,6 +142,7 @@ class ParentModeActivity : android.app.Activity() {
         content.addView(button("Pause managed apps now") { sendCommand("pause", null) })
         content.addView(button("Pause for 30 minutes") { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) })
         content.addView(button("Resume access") { sendCommand("resume", null) })
+        content.addView(button("Check command delivery") { checkCommandDelivery() })
 
         content.addView(section("Rules"))
         val keywords = field("Blocked keywords (comma separated)").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
@@ -268,6 +269,24 @@ class ParentModeActivity : android.app.Activity() {
         Thread {
             val ok = ParentApi(current).sendCommand(device.id, command, expiry)
             runOnUiThread { setStatus(if (ok) "Command sent. The child phone applies it when it next syncs." else "Could not send command.") }
+        }.start()
+    }
+
+    private fun checkCommandDelivery() {
+        val current = session ?: return
+        val device = selectedDevice ?: return
+        setStatus("Checking ${device.displayName}'s sync status…")
+        Thread {
+            val latest = ParentApi(current).latestCommandStatus(device.id)
+            runOnUiThread {
+                val lastSeen = device.lastSeenAt?.replace('T', ' ')?.substringBefore('.') ?: "not reported yet"
+                setStatus(
+                    latest?.let { command ->
+                        val acknowledged = command.acknowledgement?.let { state -> "$state at ${command.acknowledgedAt?.replace('T', ' ')?.substringBefore('.')}" } ?: "waiting for the child device to sync"
+                        "Child last seen: $lastSeen\nLatest ${command.commandType} command: $acknowledged."
+                    } ?: "Child last seen: $lastSeen\nNo remote command has been sent yet."
+                )
+            }
         }.start()
     }
 
