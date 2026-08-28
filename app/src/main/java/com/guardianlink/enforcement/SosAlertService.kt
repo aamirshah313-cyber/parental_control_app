@@ -57,20 +57,20 @@ class SosAlertService : Service() {
             api.recentAppInstallRequests().firstOrNull()?.let { request ->
                 if (request.id != prefs.getString("last_app_request_id", null)) {
                     prefs.edit().putString("last_app_request_id", request.id).apply()
-                    handler.post { showAppRequest(request.packageName) }
+                    handler.post { showAppRequest(request.appName, request.packageName) }
                 }
             }
         }.start()
     }
 
-    private fun showAppRequest(packageName: String) {
+    private fun showAppRequest(appName: String, packageName: String) {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val openDashboard = PendingIntent.getActivity(this, 0, Intent(this, ParentModeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         getSystemService(NotificationManager::class.java).notify(1204, android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("App approval requested")
-            .setContentText("Child installed: $packageName")
-            .setStyle(android.app.Notification.BigTextStyle().bigText("A child app is waiting for approval: $packageName. Open Guardian Link to allow or block it."))
+            .setContentText("Child installed: $appName")
+            .setStyle(android.app.Notification.BigTextStyle().bigText("A child app is waiting for approval: $appName ($packageName). Open Guardian Link to allow or block it."))
             .setContentIntent(openDashboard)
             .setAutoCancel(true)
             .build())

@@ -14,6 +14,10 @@ class PackageChangedReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_PACKAGE_ADDED || intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
         val packageName = intent.data?.schemeSpecificPart ?: return
         if (packageName == context.packageName) return
+        val appName = runCatching {
+            val info = context.packageManager.getApplicationInfo(packageName, 0)
+            context.packageManager.getApplicationLabel(info).toString()
+        }.getOrDefault(packageName)
         val store = PolicyStore(context)
         val policy = store.load()
         if (policy.requireAppApproval && packageName !in policy.approvedPackages) {
@@ -25,6 +29,7 @@ class PackageChangedReceiver : BroadcastReceiver() {
             AppInventoryReporter(context).reportPackage(packageName, policy.requireAppApproval && packageName !in policy.approvedPackages)
             if (session.isPaired()) SupabaseApi(session.deviceId!!, session.accessToken!!).postEvent("app_installed", JSONObject().apply {
                 put("package_name", packageName)
+                put("app_name", appName)
                 put("pending_approval", policy.requireAppApproval && packageName !in policy.approvedPackages)
             })
             pending.finish()

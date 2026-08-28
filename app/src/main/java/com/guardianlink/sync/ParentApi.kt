@@ -19,7 +19,7 @@ data class SosAlert(val id: String, val deviceId: String, val message: String, v
 data class DeviceEvent(val eventType: String, val details: JSONObject, val createdAt: String)
 data class CommandDeliveryStatus(val commandType: String, val sentAt: String, val acknowledgement: String?, val acknowledgedAt: String?)
 data class ReportedApp(val packageName: String, val displayName: String, val pendingApproval: Boolean, val lastReportedAt: String)
-data class AppInstallRequest(val id: String, val deviceId: String, val packageName: String, val createdAt: String)
+data class AppInstallRequest(val id: String, val deviceId: String, val appName: String, val packageName: String, val createdAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -144,7 +144,8 @@ class ParentApi(private val session: ParentSession) {
             val row = rows.getJSONObject(index)
             val details = row.optJSONObject("details") ?: return@mapNotNull null
             if (!details.optBoolean("pending_approval", false)) return@mapNotNull null
-            AppInstallRequest(row.getString("id"), row.getString("device_id"), details.optString("package_name", "Unknown app"), row.getString("created_at"))
+            val packageName = details.optString("package_name", "Unknown app")
+            AppInstallRequest(row.getString("id"), row.getString("device_id"), details.optString("app_name", packageName), packageName, row.getString("created_at"))
         }
     } ?: emptyList()
 
