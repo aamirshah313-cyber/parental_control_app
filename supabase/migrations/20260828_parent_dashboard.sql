@@ -15,6 +15,9 @@ create index if not exists device_locations_device_recorded_at_idx
 
 alter table public.device_locations enable row level security;
 
+-- Recreate only Guardian Link's own policies so this migration can be safely re-run.
+drop policy if exists "Child writes own locations" on public.device_locations;
+drop policy if exists "Parents read family locations" on public.device_locations;
 create policy "Child writes own locations" on public.device_locations
   for insert with check (exists (
     select 1 from public.devices d where d.id = device_id and d.child_auth_user_id = auth.uid()
@@ -37,6 +40,7 @@ alter table public.device_events add constraint device_events_event_type_check c
 -- A child session may report only its own last-seen field; it cannot edit its family or identity.
 revoke update on public.devices from authenticated;
 grant update(last_seen_at) on public.devices to authenticated;
+drop policy if exists "Child updates own last seen" on public.devices;
 create policy "Child updates own last seen" on public.devices
   for update using (child_auth_user_id = auth.uid())
   with check (child_auth_user_id = auth.uid());
