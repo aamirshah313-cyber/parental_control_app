@@ -21,12 +21,12 @@ class TimeRequestsActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(24)); setBackgroundColor(Color.rgb(246, 248, 252)) }
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(content) })
-        content.addView(TextView(this).apply { text = "TIME REQUESTS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(19, 102, 214)) })
-        content.addView(TextView(this).apply { text = "Extra screen time"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(5), 0, dp(4)) })
-        content.addView(TextView(this).apply { text = "A granted request adds time only for today. The child must sync before it takes effect."; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(10)) })
-        status = TextView(this).apply { setPadding(dp(12), dp(10), dp(12), dp(10)); setTextColor(Color.rgb(17, 80, 130)); setBackgroundColor(Color.rgb(232, 242, 255)) }
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(24)); setBackgroundColor(NoirUi.BACKGROUND) }
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
+        content.addView(TextView(this).apply { text = "TIME REQUESTS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD) })
+        content.addView(TextView(this).apply { text = "Extra screen time"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(5), 0, dp(4)) })
+        content.addView(TextView(this).apply { text = "A granted request adds time only for today. The child must sync before it takes effect."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(10)) })
+        status = TextView(this).apply { setPadding(dp(12), dp(10), dp(12), dp(10)); setTextColor(NoirUi.GOLD); setBackgroundColor(NoirUi.SURFACE_RAISED) }
         content.addView(status)
         load()
     }
@@ -48,11 +48,11 @@ class TimeRequestsActivity : android.app.Activity() {
         requests.forEach { request ->
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12))
-                background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) }
+                background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(10), 0, 0) }
             }
-            card.addView(TextView(this).apply { text = "Request for ${request.requestedMinutes} extra minutes"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
-            card.addView(TextView(this).apply { text = "Received ${request.createdAt.replace('T', ' ').substringBefore('.')}"; textSize = 13f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(3), 0, dp(8)) })
+            card.addView(TextView(this).apply { text = "Request for ${request.requestedMinutes} extra minutes"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) })
+            card.addView(TextView(this).apply { text = "Received ${request.createdAt.replace('T', ' ').substringBefore('.')}"; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, dp(8)) })
             card.addView(row("Grant ${request.requestedMinutes} min", { resolve(request, true) }, Pair("Decline", { resolve(request, false) })))
             content.addView(card)
         }
@@ -78,7 +78,7 @@ class TimeRequestsActivity : android.app.Activity() {
         addView(compact(first, firstAction), LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(0, 0, dp(4), 0) })
         addView(compact(second.first, second.second), LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(dp(4), 0, 0, 0) })
     }
-    private fun compact(text: String, action: () -> Unit) = Button(this).apply { this.text = text; textSize = 13f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); backgroundTintList = ColorStateList.valueOf(Color.rgb(232, 242, 255)); setOnClickListener { action() } }
+    private fun compact(text: String, action: () -> Unit) = Button(this).apply { this.text = text; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); setOnClickListener { action() } }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object { private const val EXTRA_DEVICE_ID = "device_id"; fun intent(context: android.content.Context, deviceId: String) = android.content.Intent(context, TimeRequestsActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId) }
 }

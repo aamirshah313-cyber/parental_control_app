@@ -105,10 +105,10 @@ class MainActivity : android.app.Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private companion object {
-        const val BACKGROUND = 0xFFF6F8FC.toInt()
-        const val NAVY = 0xFF112B4E.toInt()
-        const val MUTED = 0xFF465266.toInt()
-        const val BLUE = 0xFF1366D6.toInt()
-        const val BORDER = 0xFFE0E5EE.toInt()
+        const val BACKGROUND = 0xFF17181E.toInt()
+        const val NAVY = 0xFFF5F2EA.toInt()
+        const val MUTED = 0xFFAFAFBA.toInt()
+        const val BLUE = 0xFFD8B65B.toInt()
+        const val BORDER = 0xFF2B2D36.toInt()
     }
 }

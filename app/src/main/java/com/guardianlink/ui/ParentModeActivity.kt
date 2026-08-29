@@ -60,10 +60,10 @@ class ParentModeActivity : android.app.Activity() {
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(padding, padding, padding, padding)
-            setBackgroundColor(Color.rgb(246, 248, 252))
+            setBackgroundColor(NoirUi.BACKGROUND)
         }
         setContentView(ScrollView(this).apply {
-            setBackgroundColor(Color.rgb(246, 248, 252))
+            setBackgroundColor(NoirUi.BACKGROUND)
             addView(content, android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.MATCH_PARENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT))
         })
         if (session == null) buildSignIn() else buildDashboard(emptyList())
@@ -80,6 +80,7 @@ class ParentModeActivity : android.app.Activity() {
         val confirmPassword = field("Confirm password (needed only for new account)", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         val guardianConsent = CheckBox(this).apply {
             text = "I confirm that I am the parent or legal guardian authorized to supervise this child device."
+            setTextColor(NoirUi.TEXT)
         }
         content.addView(section("Account details"))
         content.addView(email); content.addView(password); content.addView(confirmPassword)
@@ -173,19 +174,19 @@ class ParentModeActivity : android.app.Activity() {
     private fun summaryCard(familyName: String, deviceCount: Int) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(18), dp(16), dp(18), dp(16))
-        background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244))
+        background = rounded(NoirUi.SURFACE, NoirUi.GOLD_DIM)
         layoutParams = layoutParams(0, 10)
-        addView(TextView(this@ParentModeActivity).apply { text = familyName; textSize = 20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
-        addView(TextView(this@ParentModeActivity).apply { text = "$deviceCount child device${if (deviceCount == 1) "" else "s"} linked • Choose a device to manage its protection."; textSize = 14f; setTextColor(Color.rgb(50, 78, 116)); setPadding(0, dp(4), 0, 0) })
+        addView(TextView(this@ParentModeActivity).apply { text = familyName; textSize = 20f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT) })
+        addView(TextView(this@ParentModeActivity).apply { text = "$deviceCount child device${if (deviceCount == 1) "" else "s"} linked • Choose a profile to manage."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, dp(4), 0, 0) })
     }
 
     private fun deviceCard(name: String, lastSeen: String, selected: Boolean, action: () -> Unit) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(16), dp(14), dp(16), dp(14))
-        background = rounded(if (selected) Color.rgb(232, 242, 255) else Color.WHITE, if (selected) Color.rgb(171, 204, 244) else Color.rgb(224, 229, 238))
+        background = rounded(if (selected) NoirUi.SURFACE_RAISED else NoirUi.SURFACE, if (selected) NoirUi.GOLD_DIM else NoirUi.SURFACE_RAISED)
         layoutParams = layoutParams(0, 8)
-        addView(TextView(this@ParentModeActivity).apply { text = name; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) })
-        addView(TextView(this@ParentModeActivity).apply { text = "Last device check-in: $lastSeen"; textSize = 13f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(3), 0, dp(10)) })
+        addView(TextView(this@ParentModeActivity).apply { text = name; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) })
+        addView(TextView(this@ParentModeActivity).apply { text = "Last device check-in: $lastSeen"; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, dp(10)) })
         addView(secondaryButton(if (selected) "Managing this device" else "Open controls", action).apply { isEnabled = !selected })
     }
 
@@ -197,7 +198,18 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun compactAction(label: String, action: () -> Unit) = Button(this).apply {
-        text = label; textSize = 13f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = rounded(Color.WHITE, Color.rgb(171, 204, 244)); setOnClickListener { action() }
+        text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = rounded(NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED); setOnClickListener { action() }
+    }
+
+    /** Three direct entry cards retain the reference layout while routing to real app actions. */
+    private fun controlRow(vararg controls: Pair<String, () -> Unit>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL; layoutParams = layoutParams(0, 8)
+        controls.forEachIndexed { index, control ->
+            addView(Button(this@ParentModeActivity).apply {
+                text = control.first; textSize = 13f; isAllCaps = false; gravity = Gravity.CENTER; setTextColor(NoirUi.TEXT)
+                background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); minHeight = dp(96); setOnClickListener { control.second() }
+            }, LinearLayout.LayoutParams(0, dp(96), 1f).apply { setMargins(if (index == 0) 0 else dp(4), 0, if (index == controls.lastIndex) 0 else dp(4), 0) })
+        }
     }
 
     private fun buildDashboard(devices: List<DeviceRecord>) {
@@ -246,9 +258,21 @@ class ParentModeActivity : android.app.Activity() {
             content.addView(deviceCard(device.displayName, seen, selectedDevice?.id == device.id) { selectDevice(device) })
         }
         selectedDevice?.let { device ->
-            content.addView(section("${device.displayName} at a glance"))
+            val profile = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(8)); background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); layoutParams = layoutParams(10, 8) }
+            profile.addView(NoirUi.avatar(this, device.displayName).apply { layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)) })
+            profile.addView(TextView(this).apply { text = "${device.displayName}\nActive child profile"; textSize = 15f; setTextColor(NoirUi.TEXT); setPadding(dp(12), 0, 0, 0) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            profile.addView(secondaryButton("Switch") { content.removeAllViews(); buildDashboard(devices) }.apply { minHeight = dp(42); layoutParams = LinearLayout.LayoutParams(dp(86), dp(42)) })
+            content.addView(profile)
+            content.addView(section("Today’s screen time"))
+            val dial = ScreenTimeDialView(this)
+            content.addView(dial, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(230)).apply { setMargins(0, 0, 0, dp(8)) })
             val health = note("Loading device health…")
-            content.addView(health); loadDeviceHealth(device, health)
+            content.addView(health); loadDeviceHealth(device, health, dial)
+            content.addView(controlRow(
+                "Instant\nLock" to { sendCommand("pause", null, "all_child_apps") },
+                "Geofence\nActive" to { switchSection(DashboardSection.SAFETY, devices) },
+                "Bedtime\nMode" to { switchSection(DashboardSection.CONTROLS, devices) }
+            ))
             val latest = note("Loading latest shared position…")
             content.addView(latest); loadLatestLocationPreview(device, latest)
             content.addView(actionRow("Open controls" to { switchSection(DashboardSection.CONTROLS, devices) }, "Open safety" to { switchSection(DashboardSection.SAFETY, devices) }))
@@ -279,7 +303,7 @@ class ParentModeActivity : android.app.Activity() {
             }
         ))
         content.addView(section("Location & emergency"))
-        val location = CheckBox(this).apply { text = "Enable visible child location sharing"; isChecked = selectedPolicy.locationEnabled }
+        val location = CheckBox(this).apply { text = "Enable visible child location sharing"; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.locationEnabled }
         val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
         content.addView(location); content.addView(interval)
         content.addView(button("Save location sharing") {
@@ -333,11 +357,11 @@ class ParentModeActivity : android.app.Activity() {
         loadDeviceHealth(device, health)
 
         content.addView(section("Time, access & approvals"))
-        val bedtimeEnabled = CheckBox(this).apply { text = "Enable daily bedtime"; isChecked = selectedPolicy.schedules.isNotEmpty() }
+        val bedtimeEnabled = CheckBox(this).apply { text = "Enable daily bedtime"; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.schedules.isNotEmpty() }
         val bedtimeStart = field("Bedtime starts (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.start?.toString() ?: "21:00") }
         val bedtimeEnd = field("Bedtime ends (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.end?.toString() ?: "07:00") }
         val dailyAllowance = field("Daily screen-time allowance in minutes (0 = off)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.dailyScreenLimitMinutes.toString()) }
-        val approval = CheckBox(this).apply { text = "Block newly installed apps until approved"; isChecked = selectedPolicy.requireAppApproval }
+        val approval = CheckBox(this).apply { text = "Block newly installed apps until approved"; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.requireAppApproval }
         listOf(bedtimeEnabled, bedtimeStart, bedtimeEnd, dailyAllowance, approval).forEach(content::addView)
         content.addView(button("Save and send rules") {
             val schedule = if (bedtimeEnabled.isChecked) runCatching {
@@ -496,11 +520,12 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun loadDeviceHealth(device: DeviceRecord, target: TextView) {
+    private fun loadDeviceHealth(device: DeviceRecord, target: TextView, dial: ScreenTimeDialView? = null) {
         val current = session ?: return
         Thread {
             val health = ParentApi(usableParentSession(current)).deviceHealth(device.id)
             runOnUiThread {
+                dial?.setUsage(health?.screenMinutesToday ?: 0, selectedPolicy.dailyScreenLimitMinutes)
                 target.text = health?.let {
                     val battery = it.batteryPercent?.let { value -> "$value% battery" } ?: "battery unavailable"
                     val protection = if (it.protectionActive) "protection enabled" else "protection setup incomplete"
@@ -576,37 +601,37 @@ class ParentModeActivity : android.app.Activity() {
     private fun signOut() { sessionStore.clear(); session = null; family = null; selectedDevice = null; lastPairingMessage = null; lastPairingCode = null; buildSignIn() }
     private fun usableParentSession(fallback: ParentSession) = sessionStore.ensureFresh() ?: fallback
     private fun eyebrow(text: String) = TextView(this).apply {
-        this.text = text; textSize = 12f; letterSpacing = .12f; setTextColor(Color.rgb(19, 102, 214)); typeface = Typeface.DEFAULT_BOLD
+        this.text = text; textSize = 12f; letterSpacing = .12f; setTextColor(NoirUi.GOLD); typeface = Typeface.DEFAULT_BOLD
         layoutParams = layoutParams(0, 4)
     }
     private fun title(text: String) = TextView(this).apply {
-        this.text = text; textSize = 27f; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
+        this.text = text; textSize = 27f; setTextColor(NoirUi.TEXT); typeface = Typeface.create("serif", Typeface.NORMAL)
         layoutParams = layoutParams(0, 12)
     }
     private fun section(text: String) = TextView(this).apply {
-        this.text = text; textSize = 18f; setTextColor(Color.rgb(17, 43, 78)); typeface = Typeface.DEFAULT_BOLD
+        this.text = text; textSize = 18f; setTextColor(NoirUi.TEXT); typeface = Typeface.DEFAULT_BOLD
         layoutParams = layoutParams(20, 8)
     }
     private fun note(text: String) = TextView(this).apply {
-        this.text = text; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(12), dp(14), dp(12))
-        background = rounded(Color.WHITE, Color.rgb(224, 229, 238)); layoutParams = layoutParams(0, 10)
+        this.text = text; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(12), dp(14), dp(12))
+        background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); layoutParams = layoutParams(0, 10)
     }
     private fun field(hint: String, inputType: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
-        this.hint = hint; this.inputType = inputType; textSize = 15f; setPadding(dp(14), dp(4), dp(14), dp(4))
-        background = rounded(Color.WHITE, Color.rgb(196, 208, 225)); layoutParams = layoutParams(0, 8)
+        this.hint = hint; this.inputType = inputType; textSize = 15f; setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); setPadding(dp(14), dp(4), dp(14), dp(4))
+        background = rounded(NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED); layoutParams = layoutParams(0, 8)
     }
     private fun button(text: String, action: () -> Unit) = Button(this).apply {
-        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214))
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD)
         minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
     }
     private fun secondaryButton(text: String, action: () -> Unit) = Button(this).apply {
-        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = rounded(Color.WHITE, Color.rgb(171, 204, 244))
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED)
         minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
     }
     private fun addStatus() {
         status = TextView(this).apply {
-            textSize = 14f; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244)); layoutParams = layoutParams(16, 0)
+            textSize = 14f; setTextColor(NoirUi.GOLD); setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(NoirUi.SURFACE_RAISED, NoirUi.GOLD_DIM); layoutParams = layoutParams(16, 0)
         }
         content.addView(status)
     }

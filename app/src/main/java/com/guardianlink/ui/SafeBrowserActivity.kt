@@ -29,10 +29,10 @@ class SafeBrowserActivity : android.app.Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.WHITE) }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(NoirUi.BACKGROUND) }
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(8), dp(8), dp(8), dp(4)) }
         val back = Button(this).apply { text = "‹"; textSize = 24f; isAllCaps = false; setOnClickListener { if (browser.canGoBack()) browser.goBack() } }
-        address = EditText(this).apply { hint = "Search or enter website"; setSingleLine(); textSize = 15f; background = rounded(0xFFF2F5F9.toInt()) }
+        address = EditText(this).apply { hint = "Search or enter website"; setSingleLine(); textSize = 15f; setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); background = rounded(NoirUi.SURFACE_RAISED) }
         val go = Button(this).apply { text = "Go"; isAllCaps = false; setOnClickListener { load(address.text.toString()) } }
         val sync = Button(this).apply { text = "Sync"; textSize = 12f; isAllCaps = false; setOnClickListener { syncRules(true) } }
         bar.addView(back, LinearLayout.LayoutParams(dp(48), dp(48)))
@@ -40,7 +40,7 @@ class SafeBrowserActivity : android.app.Activity() {
         bar.addView(go, LinearLayout.LayoutParams(dp(52), dp(48)))
         bar.addView(sync, LinearLayout.LayoutParams(dp(58), dp(48)))
         root.addView(bar)
-        status = TextView(this).apply { text = "Family browser • Websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(2), dp(14), dp(6)) }
+        status = TextView(this).apply { text = "Family browser • Websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(2), dp(14), dp(6)) }
         root.addView(status)
         browser = WebView(this).apply {
             settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = true
@@ -105,7 +105,7 @@ class SafeBrowserActivity : android.app.Activity() {
     }
 
     override fun onDestroy() { browser.destroy(); super.onDestroy() }
-    private fun rounded(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(14).toFloat() }
+    private fun rounded(fill: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object {
         private const val EXTRA_URL = "url"

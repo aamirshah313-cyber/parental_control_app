@@ -28,12 +28,12 @@ class ManageAppsActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(Color.rgb(246, 248, 252)) }
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(content) })
-        content.addView(TextView(this).apply { text = "APP CONTROLS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(19, 102, 214)) })
-        content.addView(TextView(this).apply { text = "Manage child apps"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(5), 0, dp(4)) })
-        content.addView(TextView(this).apply { text = "Select apps, then use a focused action below. Apps awaiting approval are called out clearly."; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(10)) })
-        status = TextView(this).apply { text = "Loading reported apps…"; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(Color.rgb(232, 242, 255)) }
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
+        content.addView(TextView(this).apply { text = "APP CONTROLS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD) })
+        content.addView(TextView(this).apply { text = "Manage child apps"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(5), 0, dp(4)) })
+        content.addView(TextView(this).apply { text = "Select apps, then use a focused action below. Apps awaiting approval are called out clearly."; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(10)) })
+        status = TextView(this).apply { text = "Loading reported apps…"; setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(NoirUi.SURFACE_RAISED) }
         content.addView(status)
         load()
     }
@@ -59,7 +59,7 @@ class ManageAppsActivity : android.app.Activity() {
             return
         }
         status.text = "${apps.size} reported app${if (apps.size == 1) "" else "s"}. ${apps.count { it.pendingApproval }} awaiting parent approval."
-        val selectAll = CheckBox(this).apply { text = "Select all reported apps"; setOnCheckedChangeListener { _, checked -> selected.values.forEach { it.isChecked = checked } } }
+        val selectAll = CheckBox(this).apply { text = "Select all reported apps"; setTextColor(NoirUi.TEXT); setOnCheckedChangeListener { _, checked -> selected.values.forEach { it.isChecked = checked } } }
         content.addView(selectAll)
         apps.forEach { app ->
             val state = when {
@@ -71,8 +71,8 @@ class ManageAppsActivity : android.app.Activity() {
             }
             val box = CheckBox(this).apply {
                 text = "${app.displayName} — $state\n${app.packageName}"
-                textSize = 14f; setTextColor(Color.rgb(35, 50, 70)); setPadding(dp(12), dp(8), dp(12), dp(8))
-                background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) }
+                textSize = 14f; setTextColor(NoirUi.TEXT); setPadding(dp(12), dp(8), dp(12), dp(8))
+                background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
                 layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(5), 0, dp(2)) }
             }
             selected[app.packageName] = box
@@ -86,11 +86,11 @@ class ManageAppsActivity : android.app.Activity() {
             "Add to pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } },
             "Remove from pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages - chosen()) } }
         ))
-        content.addView(TextView(this).apply { text = "Daily limits"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(18), 0, dp(4)) })
-        content.addView(TextView(this).apply { text = "Apply a daily limit to every selected app. It works alongside bedtime and instant pause."; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(6)) })
+        content.addView(TextView(this).apply { text = "Daily limits"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT); setPadding(0, dp(18), 0, dp(4)) })
+        content.addView(TextView(this).apply { text = "Apply a daily limit to every selected app. It works alongside bedtime and instant pause."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(6)) })
         val dailyMinutes = EditText(this).apply {
             hint = "Minutes per day (5–720)"; inputType = InputType.TYPE_CLASS_NUMBER
-            setPadding(dp(14), dp(4), dp(14), dp(4)); background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(196, 208, 225)) }
+            setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); setPadding(dp(14), dp(4), dp(14), dp(4)); background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
         }
         content.addView(dailyMinutes)
         content.addView(actionRow(
@@ -121,14 +121,14 @@ class ManageAppsActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun primaryButton(label: String, action: () -> Unit) = Button(this).apply { text = label; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)); minHeight = dp(48); setOnClickListener { action() } }
+    private fun primaryButton(label: String, action: () -> Unit) = Button(this).apply { text = label; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); minHeight = dp(48); setOnClickListener { action() } }
     private fun actionRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
         addView(compactButton(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) })
         addView(compactButton(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) })
     }
-    private fun compactButton(label: String, action: () -> Unit) = Button(this).apply { text = label; textSize = 13f; isAllCaps = false; setTextColor(Color.rgb(19, 102, 214)); background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) }; setOnClickListener { action() } }
+    private fun compactButton(label: String, action: () -> Unit) = Button(this).apply { text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }; setOnClickListener { action() } }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {

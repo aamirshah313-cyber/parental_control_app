@@ -42,23 +42,23 @@ class HowToUseActivity : android.app.Activity() {
     }
 
     private fun guideCard(number: String, title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; setPadding(dp(14), dp(13), dp(14), dp(13)); background = rounded(Color.WHITE, BORDER); layoutParams = margins(7)
-        addView(TextView(this@HowToUseActivity).apply { text = number; textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setTextColor(BLUE); background = rounded(0xFFE8F1FF.toInt(), 0xFFE8F1FF.toInt()); layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
+        orientation = LinearLayout.HORIZONTAL; setPadding(dp(14), dp(13), dp(14), dp(13)); background = rounded(0xFF23242C.toInt(), BORDER); layoutParams = margins(7)
+        addView(TextView(this@HowToUseActivity).apply { text = number; textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setTextColor(BACKGROUND); background = rounded(BLUE, BLUE); layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
         addView(LinearLayout(this@HowToUseActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@HowToUseActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY) }); addView(TextView(this@HowToUseActivity).apply { text = body; textSize = 13f; setTextColor(MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
-    private fun outlined() = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), 0xFFABD0F4.toInt()) }
+    private fun outlined() = GradientDrawable().apply { setColor(0xFF23242C.toInt()); cornerRadius = dp(14).toFloat(); setStroke(dp(1), BORDER) }
     private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat(); setStroke(dp(1), stroke) }
     private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val EXTRA_PARENT = "parent_mode"
-        private const val BACKGROUND = 0xFFF6F8FC.toInt()
-        private const val NAVY = 0xFF112B4E.toInt()
-        private const val MUTED = 0xFF465266.toInt()
-        private const val BLUE = 0xFF1366D6.toInt()
-        private const val BORDER = 0xFFE0E5EE.toInt()
+        private const val BACKGROUND = 0xFF17181E.toInt()
+        private const val NAVY = 0xFFF5F2EA.toInt()
+        private const val MUTED = 0xFFAFAFBA.toInt()
+        private const val BLUE = 0xFFD8B65B.toInt()
+        private const val BORDER = 0xFF2B2D36.toInt()
         fun parentIntent(context: android.content.Context) = android.content.Intent(context, HowToUseActivity::class.java).putExtra(EXTRA_PARENT, true)
         fun childIntent(context: android.content.Context) = android.content.Intent(context, HowToUseActivity::class.java)
     }

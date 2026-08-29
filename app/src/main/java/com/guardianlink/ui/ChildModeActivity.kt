@@ -32,10 +32,10 @@ class ChildModeActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(20), dp(24), dp(20), dp(28)); setBackgroundColor(Color.rgb(246, 248, 252)) }
-        root.addView(TextView(this).apply { text = "CHILD DEVICE SETUP"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(19, 102, 214)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-        root.addView(TextView(this).apply { text = "Set up protection together"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(5), 0, dp(4)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-        root.addView(TextView(this).apply { text = "Pair this phone first. Android permissions are requested only in the final activation step."; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(12)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(20), dp(24), dp(20), dp(28)); setBackgroundColor(NoirUi.BACKGROUND) }
+        root.addView(TextView(this).apply { text = "CHILD DEVICE SETUP"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
+        root.addView(TextView(this).apply { text = "Set up protection together"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(5), 0, dp(4)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
+        root.addView(TextView(this).apply { text = "Pair this phone first. Android permissions are requested only in the final activation step."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(12)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
         root.addView(Button(this).apply { text = "How to use this child device"; setOnClickListener { startActivity(HowToUseActivity.childIntent(this@ChildModeActivity)) } })
 
         root.addView(stepHeader("1", "Pair this child phone", "Paste the single-use code shown in the parent dashboard."))
@@ -107,10 +107,10 @@ class ChildModeActivity : android.app.Activity() {
         root.addView(Button(this).apply { text = "Quick messages with parent"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Use this as default browser"; setOnClickListener { requestDefaultBrowser() } })
-        status = TextView(this)
+        status = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() } }
         root.addView(status)
         styleControls(root)
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(root) })
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(root) })
     }
 
     private fun completeStepFive() {
@@ -193,14 +193,14 @@ class ChildModeActivity : android.app.Activity() {
                 is Button -> child.apply {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
-                        text.toString().startsWith("SOS") -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(190, 45, 65)) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
-                        else -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)) }
+                        text.toString().startsWith("SOS") -> { setTextColor(NoirUi.TEXT); backgroundTintList = ColorStateList.valueOf(NoirUi.DANGER) }
+                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(NoirUi.TEXT); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) } }
+                        else -> { setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }
                 }
                 is EditText -> child.apply {
-                    setPadding(dp(14), dp(4), dp(14), dp(4)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(196, 208, 225)) }
+                    setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); setPadding(dp(14), dp(4), dp(14), dp(4)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, dp(10)) }
                 }
             }
@@ -208,13 +208,13 @@ class ChildModeActivity : android.app.Activity() {
     }
 
     private fun stepHeader(number: String, title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP; setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(16).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) }
+        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP; setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(16).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(10), 0, dp(4)) }
-        addView(TextView(this@ChildModeActivity).apply { text = number; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.rgb(232, 242, 255)); shape = GradientDrawable.OVAL }; layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
-        addView(LinearLayout(this@ChildModeActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)) }); addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(TextView(this@ChildModeActivity).apply { text = number; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(NoirUi.BACKGROUND); background = GradientDrawable().apply { setColor(NoirUi.GOLD); shape = GradientDrawable.OVAL }; layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
+        addView(LinearLayout(this@ChildModeActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) }); addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
-    private fun infoCard(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(Color.rgb(232, 242, 255)); cornerRadius = dp(14).toFloat() }; layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(2), 0, 0) } }
+    private fun infoCard(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() }; layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(2), 0, 0) } }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

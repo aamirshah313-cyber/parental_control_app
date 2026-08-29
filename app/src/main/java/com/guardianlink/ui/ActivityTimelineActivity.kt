@@ -18,12 +18,12 @@ class ActivityTimelineActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(Color.rgb(246, 248, 252)) }
-        setContentView(ScrollView(this).apply { setBackgroundColor(Color.rgb(246, 248, 252)); addView(content) })
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
         val name = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Child device"
-        content.addView(TextView(this).apply { text = "$name activity"; textSize = 25f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); gravity = Gravity.CENTER_HORIZONTAL })
-        content.addView(TextView(this).apply { text = "Important safety and protection events only — no browsing history or message content."; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(10), 0, dp(12)) })
-        state = TextView(this).apply { setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(Color.rgb(232, 242, 255)); text = "Loading activity…" }
+        content.addView(TextView(this).apply { text = "$name activity"; textSize = 25f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); gravity = Gravity.CENTER_HORIZONTAL })
+        content.addView(TextView(this).apply { text = "Important safety and protection events only — no browsing history or message content."; setTextColor(NoirUi.MUTED); setPadding(0, dp(10), 0, dp(12)) })
+        state = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(NoirUi.SURFACE_RAISED); text = "Loading activity…" }
         content.addView(state)
         loadEvents()
     }
@@ -46,8 +46,8 @@ class ActivityTimelineActivity : android.app.Activity() {
 
     private fun eventCard(event: DeviceEvent) = TextView(this).apply {
         text = "${eventTitle(event)}\n${event.createdAt.replace('T', ' ').substringBefore('.')}"
-        textSize = 15f; setTextColor(Color.rgb(35, 50, 70)); setPadding(dp(14), dp(12), dp(14), dp(12))
-        background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) }
+        textSize = 15f; setTextColor(NoirUi.TEXT); setPadding(dp(14), dp(12), dp(14), dp(12))
+        background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
     }
 

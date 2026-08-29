@@ -32,14 +32,14 @@ class LiveLocationActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(Color.rgb(246, 248, 252)) }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
         val name = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Child device"
-        root.addView(TextView(this).apply { text = "LATEST SHARED POSITION"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; letterSpacing = .12f; setTextColor(Color.rgb(19, 102, 214)) })
-        root.addView(TextView(this).apply { text = "$name location"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(4), 0, 0) })
-        root.addView(TextView(this).apply { text = "Latest check-in only • refreshes every 30 seconds while this screen is open"; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, dp(6), 0, dp(8)) })
-        details = TextView(this).apply { setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(Color.rgb(232, 242, 255)) }
+        root.addView(TextView(this).apply { text = "LATEST SHARED POSITION"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; letterSpacing = .12f; setTextColor(NoirUi.GOLD) })
+        root.addView(TextView(this).apply { text = "$name location"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(4), 0, 0) })
+        root.addView(TextView(this).apply { text = "Latest check-in only • refreshes every 30 seconds while this screen is open"; setTextColor(NoirUi.MUTED); setPadding(0, dp(6), 0, dp(8)) })
+        details = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(NoirUi.SURFACE_RAISED) }
         root.addView(details)
-        mapPrompt = TextView(this).apply { text = "Google Maps\nOpen the latest coordinate in Google Maps for directions, navigation, and the full map view."; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(dp(18), dp(24), dp(18), dp(24)); gravity = Gravity.CENTER; background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(18).toFloat(); setStroke(dp(1), Color.rgb(224, 229, 238)) } }
+        mapPrompt = TextView(this).apply { text = "Google Maps\nOpen the latest coordinate in Google Maps for directions, navigation, and the full map view."; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT); setPadding(dp(18), dp(24), dp(18), dp(24)); gravity = Gravity.CENTER; background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(18).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) } }
         root.addView(mapPrompt, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f).apply { setMargins(0, dp(10), 0, 0) })
         root.addView(button("Refresh now") { loadLatestLocation() })
         root.addView(button("Open in Google Maps") { latestLatitude?.let { latitude -> latestLongitude?.let { longitude -> openExternalMap(latitude, longitude) } } })
@@ -74,7 +74,7 @@ class LiveLocationActivity : android.app.Activity() {
     }
 
     private fun button(label: String, action: () -> Unit) = Button(this).apply {
-        text = label; textSize = 15f; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)); minHeight = dp(48)
+        text = label; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); minHeight = dp(48)
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
         setOnClickListener { action() }
     }

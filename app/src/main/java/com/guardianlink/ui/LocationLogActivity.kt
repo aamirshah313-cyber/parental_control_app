@@ -54,13 +54,13 @@ class LocationLogActivity : android.app.Activity() {
     }
 
     private fun locationCard(location: LocationRecord) = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setPadding(dp(15), dp(13), dp(15), dp(13)); background = rounded(Color.WHITE, BORDER); layoutParams = margins(8)
+        orientation = LinearLayout.VERTICAL; setPadding(dp(15), dp(13), dp(15), dp(13)); background = rounded(0xFF23242C.toInt(), BORDER); layoutParams = margins(8)
         addView(TextView(this@LocationLogActivity).apply { text = location.recordedAt.replace('T', ' ').substringBefore('.'); textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY) })
         addView(TextView(this@LocationLogActivity).apply { text = String.format(Locale.US, "%.5f, %.5f  •  ±%s", location.latitude, location.longitude, location.accuracyMeters?.let { "${it.toInt()} m" } ?: "unknown"); textSize = 14f; setTextColor(MUTED); setPadding(0, dp(4), 0, dp(10)) })
         addView(Button(this@LocationLogActivity).apply { text = "Open this check-in in maps"; isAllCaps = false; textSize = 14f; setTextColor(BLUE); background = outlined(); setOnClickListener { MapNavigator.openCoordinates(this@LocationLogActivity, location.latitude, location.longitude) } })
     }
 
-    private fun messageCard(text: String) = TextView(this).apply { this.text = text; textSize = 14f; setTextColor(MUTED); setPadding(dp(15), dp(13), dp(15), dp(13)); background = rounded(Color.WHITE, BORDER) }
+    private fun messageCard(text: String) = TextView(this).apply { this.text = text; textSize = 14f; setTextColor(MUTED); setPadding(dp(15), dp(13), dp(15), dp(13)); background = rounded(0xFF23242C.toInt(), BORDER) }
     private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
     private fun outlined() = GradientDrawable().apply { setColor(Color.TRANSPARENT); cornerRadius = dp(14).toFloat(); setStroke(dp(1), BLUE) }
     private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat(); setStroke(dp(1), stroke) }
@@ -69,11 +69,11 @@ class LocationLogActivity : android.app.Activity() {
     companion object {
         const val EXTRA_DEVICE_ID = "device_id"
         const val EXTRA_DEVICE_NAME = "device_name"
-        const val BACKGROUND = 0xFFF6F8FC.toInt()
-        const val NAVY = 0xFF112B4E.toInt()
-        const val MUTED = 0xFF465266.toInt()
-        const val BLUE = 0xFF1366D6.toInt()
-        const val BORDER = 0xFFE0E5EE.toInt()
+        const val BACKGROUND = 0xFF17181E.toInt()
+        const val NAVY = 0xFFF5F2EA.toInt()
+        const val MUTED = 0xFFAFAFBA.toInt()
+        const val BLUE = 0xFFD8B65B.toInt()
+        const val BORDER = 0xFF2B2D36.toInt()
         fun intent(context: android.content.Context, deviceId: String, deviceName: String) =
             android.content.Intent(context, LocationLogActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).putExtra(EXTRA_DEVICE_NAME, deviceName)
     }
