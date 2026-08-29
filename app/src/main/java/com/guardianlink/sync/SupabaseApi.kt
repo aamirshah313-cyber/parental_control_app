@@ -8,6 +8,7 @@ import java.net.URL
 
 data class RemoteCommand(val id: String, val type: String, val scope: String, val expiresAtEpochMs: Long?)
 data class ReportedAppPayload(val packageName: String, val displayName: String, val pendingApproval: Boolean? = null)
+data class ChildQuickMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
 
 /** Small dependency-free REST client. The app uses its public anon key plus the child device JWT. */
 class SupabaseApi(private val deviceId: String, private val accessToken: String) {
@@ -60,6 +61,24 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
             put("longitude", longitude)
             accuracyMeters?.let { put("accuracy_meters", it) }
         })
+    }
+
+    fun quickMessages(): List<ChildQuickMessage> {
+        if (!enabled) return emptyList()
+        val rows = get("/rest/v1/family_messages?device_id=eq.$deviceId&select=id,sender_role,template_key,body,created_at&order=created_at.desc&limit=50") ?: return emptyList()
+        return (0 until rows.length()).map { index ->
+            rows.getJSONObject(index).let { ChildQuickMessage(it.getString("id"), it.getString("sender_role"), it.getString("template_key"), it.getString("body"), it.getString("created_at")) }
+        }.reversed()
+    }
+
+    fun sendQuickMessage(templateKey: String, body: String): Boolean {
+        if (!enabled) return false
+        val familyRows = get("/rest/v1/devices?id=eq.$deviceId&select=family_id") ?: return false
+        if (familyRows.length() == 0) return false
+        return request("POST", "/rest/v1/family_messages", JSONObject().apply {
+            put("family_id", familyRows.getJSONObject(0).getString("family_id")); put("device_id", deviceId)
+            put("sender_role", "child"); put("template_key", templateKey); put("body", body)
+        }.toString()) != null
     }
 
     fun upsertReportedApps(apps: List<ReportedAppPayload>): Boolean {

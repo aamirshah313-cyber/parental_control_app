@@ -21,6 +21,7 @@ data class DeviceEvent(val eventType: String, val details: JSONObject, val creat
 data class CommandDeliveryStatus(val commandType: String, val sentAt: String, val acknowledgement: String?, val acknowledgedAt: String?)
 data class ReportedApp(val packageName: String, val displayName: String, val pendingApproval: Boolean, val lastReportedAt: String)
 data class AppInstallRequest(val id: String, val deviceId: String, val appName: String, val packageName: String, val createdAt: String)
+data class FamilyMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -81,8 +82,13 @@ class ParentApi(private val session: ParentSession) {
         return rows.takeIf { it.length() > 0 }?.getJSONObject(0)?.let { FamilyRecord(it.getString("id"), it.getString("name")) }
     }
 
-    fun devices(familyId: String): List<DeviceRecord> = get("/rest/v1/devices?family_id=eq.$familyId&select=id,display_name,last_seen_at&order=created_at.asc")?.let { rows ->
+    /** A repeated pairing can leave legacy rows behind. Present each normalized child/device name only once, preferring the most recently active row. */
+    fun devices(familyId: String): List<DeviceRecord> = get("/rest/v1/devices?family_id=eq.$familyId&select=id,display_name,last_seen_at,created_at&order=created_at.desc")?.let { rows ->
         (0 until rows.length()).map { index -> rows.getJSONObject(index).let { DeviceRecord(it.getString("id"), it.getString("display_name"), it.optString("last_seen_at").ifBlank { null }) } }
+            .groupBy { it.displayName.trim().lowercase() }
+            .values
+            .map { matches -> matches.maxWithOrNull(compareBy<DeviceRecord> { it.lastSeenAt ?: "" }.thenBy { it.id })!! }
+            .sortedBy { it.displayName.lowercase() }
     } ?: emptyList()
 
     fun createPairing(familyId: String, childName: String, validitySeconds: Int): PairingCode? {
@@ -175,6 +181,16 @@ class ParentApi(private val session: ParentSession) {
             AppInstallRequest(row.getString("id"), row.getString("device_id"), details.optString("app_name", packageName), packageName, row.getString("created_at"))
         }
     } ?: emptyList()
+
+    fun quickMessages(deviceId: String): List<FamilyMessage> = get("/rest/v1/family_messages?device_id=eq.$deviceId&select=id,sender_role,template_key,body,created_at&order=created_at.desc&limit=50")?.let { rows ->
+        (0 until rows.length()).map { index -> messageRecord(rows.getJSONObject(index)) }.reversed()
+    } ?: emptyList()
+
+    fun sendQuickMessage(familyId: String, deviceId: String, templateKey: String, body: String): Boolean = post("/rest/v1/family_messages", JSONObject().apply {
+        put("family_id", familyId); put("device_id", deviceId); put("sender_role", "parent"); put("template_key", templateKey); put("body", body)
+    }) != null
+
+    private fun messageRecord(row: JSONObject) = FamilyMessage(row.getString("id"), row.getString("sender_role"), row.getString("template_key"), row.getString("body"), row.getString("created_at"))
 
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
     private fun post(path: String, body: JSONObject, returnRepresentation: Boolean = false): JSONArray? = request("POST", path, body.toString(), returnRepresentation)?.takeIf { it.isNotBlank() }?.let(::JSONArray) ?: if (!returnRepresentation) JSONArray() else null

@@ -36,6 +36,7 @@ Run these SQL files in the Supabase SQL Editor, in order:
 2. [`supabase/migrations/20260828_parent_dashboard.sql`](supabase/migrations/20260828_parent_dashboard.sql)
 3. [`supabase/migrations/20260828_sos_alert.sql`](supabase/migrations/20260828_sos_alert.sql)
 4. [`supabase/migrations/20260828_reported_apps.sql`](supabase/migrations/20260828_reported_apps.sql)
+5. [`supabase/migrations/20260829_family_quick_messages.sql`](supabase/migrations/20260829_family_quick_messages.sql)
 
 Deploy the Edge Functions:
 

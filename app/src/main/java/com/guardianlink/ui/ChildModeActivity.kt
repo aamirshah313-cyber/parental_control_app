@@ -93,6 +93,7 @@ class ChildModeActivity : android.app.Activity() {
             text = "SOS — alert parent"
             setOnClickListener { sendSos() }
         })
+        root.addView(Button(this).apply { text = "Quick messages with parent"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         status = TextView(this)
         root.addView(status)
@@ -143,7 +144,7 @@ class ChildModeActivity : android.app.Activity() {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
                         text.toString().startsWith("SOS") -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(190, 45, 65)) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
+                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
                         else -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }

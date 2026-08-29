@@ -241,8 +241,9 @@ class ParentModeActivity : android.app.Activity() {
         ))
         content.addView(actionRow(
             "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) },
-            "Delivery status" to { checkCommandDelivery() }
+            "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
         ))
+        content.addView(secondaryButton("Check command delivery") { checkCommandDelivery() })
 
         content.addView(section("Rules"))
         val keywords = field("Blocked keywords (comma separated)").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
