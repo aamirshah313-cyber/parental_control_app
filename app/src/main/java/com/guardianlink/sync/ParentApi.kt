@@ -186,6 +186,11 @@ class ParentApi(private val session: ParentSession) {
         (0 until rows.length()).map { index -> messageRecord(rows.getJSONObject(index)) }.reversed()
     } ?: emptyList()
 
+    fun latestQuickMessage(deviceId: String, senderRole: String): FamilyMessage? =
+        get("/rest/v1/family_messages?device_id=eq.$deviceId&sender_role=eq.$senderRole&select=id,sender_role,template_key,body,created_at&order=created_at.desc&limit=1")
+            ?.takeIf { it.length() > 0 }
+            ?.let { messageRecord(it.getJSONObject(0)) }
+
     fun sendQuickMessage(familyId: String, deviceId: String, templateKey: String, body: String): Boolean = post("/rest/v1/family_messages", JSONObject().apply {
         put("family_id", familyId); put("device_id", deviceId); put("sender_role", "parent"); put("template_key", templateKey); put("body", body)
     }) != null

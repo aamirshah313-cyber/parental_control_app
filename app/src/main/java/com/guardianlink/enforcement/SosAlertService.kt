@@ -18,6 +18,7 @@ import android.speech.tts.TextToSpeech
 import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
 import com.guardianlink.ui.ParentModeActivity
+import com.guardianlink.ui.QuickMessagesActivity
 import com.guardianlink.ui.SosAlertActivity
 import com.guardianlink.R
 import java.util.Locale
@@ -29,6 +30,7 @@ class SosAlertService : Service() {
     private var toneGenerator: ToneGenerator? = null
     private var voice: TextToSpeech? = null
     private val prefs by lazy { getSharedPreferences("guardian_sos", MODE_PRIVATE) }
+    private var lastMessagePollAt = 0L
 
     private val poll = object : Runnable {
         override fun run() {
@@ -65,7 +67,35 @@ class SosAlertService : Service() {
                     handler.post { showAppRequest(request.appName, request.packageName) }
                 }
             }
+            val now = System.currentTimeMillis()
+            if (now - lastMessagePollAt >= 15_000) {
+                lastMessagePollAt = now
+                api.families().firstOrNull()?.let { family ->
+                    api.devices(family.id).forEach { device ->
+                        api.latestQuickMessage(device.id, "child")?.let { message ->
+                            val key = "last_child_message_${device.id}"
+                            if (message.id != prefs.getString(key, null)) {
+                                prefs.edit().putString(key, message.id).apply()
+                                handler.post { showQuickMessage(family.id, device.id, device.displayName, message.body) }
+                            }
+                        }
+                    }
+                }
+            }
         }.start()
+    }
+
+    private fun showQuickMessage(familyId: String, deviceId: String, deviceName: String, body: String) {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        val open = PendingIntent.getActivity(this, deviceId.hashCode(), QuickMessagesActivity.parentIntent(this, familyId, deviceId, deviceName), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        getSystemService(NotificationManager::class.java).notify(2200 + (deviceId.hashCode() and 0x3ff), android.app.Notification.Builder(this, "sos_receiver")
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentTitle("Message from $deviceName")
+            .setContentText(body)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(body))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build())
     }
 
     private fun showAppRequest(appName: String, packageName: String) {

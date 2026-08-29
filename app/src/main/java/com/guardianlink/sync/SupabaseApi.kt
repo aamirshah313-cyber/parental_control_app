@@ -71,6 +71,13 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         }.reversed()
     }
 
+    fun latestQuickMessage(senderRole: String): ChildQuickMessage? {
+        if (!enabled) return null
+        val rows = get("/rest/v1/family_messages?device_id=eq.$deviceId&sender_role=eq.$senderRole&select=id,sender_role,template_key,body,created_at&order=created_at.desc&limit=1") ?: return null
+        if (rows.length() == 0) return null
+        return rows.getJSONObject(0).let { ChildQuickMessage(it.getString("id"), it.getString("sender_role"), it.getString("template_key"), it.getString("body"), it.getString("created_at")) }
+    }
+
     fun sendQuickMessage(templateKey: String, body: String): Boolean {
         if (!enabled) return false
         val familyRows = get("/rest/v1/devices?id=eq.$deviceId&select=family_id") ?: return false

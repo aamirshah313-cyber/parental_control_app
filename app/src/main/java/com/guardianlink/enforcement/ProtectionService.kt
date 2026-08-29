@@ -2,6 +2,7 @@ package com.guardianlink.enforcement
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Handler
@@ -11,6 +12,7 @@ import com.guardianlink.R
 import com.guardianlink.policy.PolicyEngine
 import com.guardianlink.policy.PolicyStore
 import com.guardianlink.ui.BlockingActivity
+import com.guardianlink.ui.QuickMessagesActivity
 
 class ProtectionService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -19,6 +21,7 @@ class ProtectionService : Service() {
     private val engine = PolicyEngine()
     private var lastBlockedPackage: String? = null
     private var lastCloudSync = 0L
+    private val messagePrefs by lazy { getSharedPreferences("guardian_child_messages", MODE_PRIVATE) }
 
     private val check = object : Runnable {
         override fun run() {
@@ -58,6 +61,23 @@ class ProtectionService : Service() {
         if (now - lastCloudSync < 30_000) return
         lastCloudSync = now
         Thread { com.guardianlink.sync.PolicySynchronizer(this).sync() }.start()
+        Thread { checkForParentMessage() }.start()
+    }
+
+    private fun checkForParentMessage() {
+        val message = com.guardianlink.sync.DeviceSessionStore(this).api()?.latestQuickMessage("parent") ?: return
+        if (message.id == messagePrefs.getString("last_parent_message_id", null)) return
+        messagePrefs.edit().putString("last_parent_message_id", message.id).apply()
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        val open = PendingIntent.getActivity(this, 2201, QuickMessagesActivity.childIntent(this), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        getSystemService(NotificationManager::class.java).notify(2201, android.app.Notification.Builder(this, "protection")
+            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setContentTitle("Message from parent")
+            .setContentText(message.body)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(message.body))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build())
     }
 
     private fun createChannel() {
