@@ -41,6 +41,7 @@ object PolicyJson {
             put("package_name", limit.packageName)
             put("daily_minutes", limit.dailyMinutes)
         }) } })
+        put("daily_screen_limit_minutes", policy.dailyScreenLimitMinutes.coerceIn(0, 1_440))
     }.toString()
 
     fun decode(raw: String): ChildPolicy = runCatching {
@@ -74,7 +75,8 @@ object PolicyJson {
             appLimits = data.optJSONArray("app_limits")?.let { limits -> (0 until limits.length()).map { index ->
                 val limit = limits.getJSONObject(index)
                 AppLimit(limit.getString("package_name"), limit.getInt("daily_minutes"))
-            } } ?: emptyList()
+            } } ?: emptyList(),
+            dailyScreenLimitMinutes = data.optInt("daily_screen_limit_minutes", 0).coerceIn(0, 1_440)
         )
     }.getOrElse { ChildPolicy() }
 

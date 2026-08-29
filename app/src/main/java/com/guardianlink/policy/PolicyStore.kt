@@ -4,6 +4,7 @@ import android.content.Context
 import com.guardianlink.model.ChildPolicy
 import java.time.DayOfWeek
 import java.time.LocalTime
+import java.time.LocalDate
 
 /** Local cache deliberately remains the source of enforcement when the cloud is unreachable. */
 class PolicyStore(context: Context) {
@@ -54,6 +55,23 @@ class PolicyStore(context: Context) {
     fun markPendingApproval(packageName: String) {
         val pending = (prefs.getStringSet("pending_approval_packages", emptySet()) ?: emptySet()) + packageName
         prefs.edit().putStringSet("pending_approval_packages", pending).apply()
+    }
+
+    /** Extra time is a one-day, parent-granted allowance; it automatically expires at the next local day. */
+    fun addDailyBonusMinutes(minutes: Int) {
+        val today = LocalDate.now().toString()
+        val storedDay = prefs.getString("bonus_day", null)
+        val current = if (storedDay == today) prefs.getInt("bonus_minutes", 0) else 0
+        prefs.edit().putString("bonus_day", today).putInt("bonus_minutes", (current + minutes).coerceIn(0, 360)).apply()
+    }
+
+    fun dailyBonusMinutes(): Int {
+        val today = LocalDate.now().toString()
+        if (prefs.getString("bonus_day", null) != today) {
+            prefs.edit().remove("bonus_day").remove("bonus_minutes").apply()
+            return 0
+        }
+        return prefs.getInt("bonus_minutes", 0).coerceIn(0, 360)
     }
     fun saveFromCloudJson(raw: String) = save(PolicyJson.decode(raw))
 }

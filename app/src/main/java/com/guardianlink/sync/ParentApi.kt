@@ -22,6 +22,8 @@ data class CommandDeliveryStatus(val commandType: String, val sentAt: String, va
 data class ReportedApp(val packageName: String, val displayName: String, val pendingApproval: Boolean, val lastReportedAt: String)
 data class AppInstallRequest(val id: String, val deviceId: String, val appName: String, val packageName: String, val createdAt: String)
 data class FamilyMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
+data class TimeRequest(val id: String, val deviceId: String, val requestedMinutes: Int, val createdAt: String)
+data class DeviceHealth(val batteryPercent: Int?, val protectionActive: Boolean, val usageAccessAvailable: Boolean, val screenMinutesToday: Int, val reportedAt: String)
 
 /** Dependency-free parent REST client. All database access is still protected by Supabase RLS. */
 class ParentApi(private val session: ParentSession) {
@@ -83,7 +85,7 @@ class ParentApi(private val session: ParentSession) {
     }
 
     /** A repeated pairing can leave legacy rows behind. Present each normalized child/device name only once, preferring the most recently active row. */
-    fun devices(familyId: String): List<DeviceRecord> = get("/rest/v1/devices?family_id=eq.$familyId&select=id,display_name,last_seen_at,created_at&order=created_at.desc")?.let { rows ->
+    fun devices(familyId: String): List<DeviceRecord> = get("/rest/v1/devices?family_id=eq.$familyId&retired_at=is.null&select=id,display_name,last_seen_at,created_at&order=created_at.desc")?.let { rows ->
         (0 until rows.length()).map { index -> rows.getJSONObject(index).let { DeviceRecord(it.getString("id"), it.getString("display_name"), it.optString("last_seen_at").ifBlank { null }) } }
             .groupBy { it.displayName.trim().lowercase() }
             .values
@@ -98,10 +100,27 @@ class ParentApi(private val session: ParentSession) {
         return PairingCode(result.getString("pair_code"), result.optInt("expires_in_seconds", validitySeconds))
     }
 
-    fun sendCommand(deviceId: String, command: String, expiresAtEpochMs: Long? = null, scope: String = "managed_apps"): Boolean = post("/rest/v1/parent_commands", JSONObject().apply {
+    fun sendCommand(deviceId: String, command: String, expiresAtEpochMs: Long? = null, scope: String = "managed_apps", payload: JSONObject? = null): Boolean = post("/rest/v1/parent_commands", JSONObject().apply {
         put("device_id", deviceId); put("command_type", command); put("scope", scope)
         expiresAtEpochMs?.let { put("expires_at", java.time.Instant.ofEpochMilli(it).toString()) }
+        payload?.let { put("payload", it) }
     }) != null
+
+    /** Uses a server-side ownership check because child sessions may update only last_seen_at. */
+    fun retireDevice(deviceId: String): Boolean = function("retire-device", JSONObject().put("device_id", deviceId))?.optBoolean("retired", false) == true
+
+    fun deviceHealth(deviceId: String): DeviceHealth? = get("/rest/v1/device_health?device_id=eq.$deviceId&select=battery_percent,protection_active,usage_access_available,screen_minutes_today,reported_at&order=reported_at.desc&limit=1")
+        ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.let { row ->
+            DeviceHealth(row.optInt("battery_percent", -1).takeIf { it >= 0 }, row.optBoolean("protection_active"), row.optBoolean("usage_access_available"), row.optInt("screen_minutes_today", 0), row.getString("reported_at"))
+        }
+
+    fun pendingTimeRequests(deviceId: String): List<TimeRequest> = get("/rest/v1/child_time_requests?device_id=eq.$deviceId&status=eq.pending&select=id,device_id,requested_minutes,created_at&order=created_at.asc")?.let { rows ->
+        (0 until rows.length()).map { index -> rows.getJSONObject(index).let { TimeRequest(it.getString("id"), it.getString("device_id"), it.getInt("requested_minutes"), it.getString("created_at")) } }
+    } ?: emptyList()
+
+    fun resolveTimeRequest(requestId: String, status: String, grantedMinutes: Int? = null): Boolean = patch("/rest/v1/child_time_requests?id=eq.$requestId", JSONObject().apply {
+        put("status", status); put("resolved_at", java.time.Instant.now().toString()); grantedMinutes?.let { put("granted_minutes", it) }
+    })
 
     /** Latest command plus the child's explicit acknowledgement, if the child has synced. */
     fun latestCommandStatus(deviceId: String): CommandDeliveryStatus? {
@@ -200,6 +219,7 @@ class ParentApi(private val session: ParentSession) {
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
     private fun post(path: String, body: JSONObject, returnRepresentation: Boolean = false): JSONArray? = request("POST", path, body.toString(), returnRepresentation)?.takeIf { it.isNotBlank() }?.let(::JSONArray) ?: if (!returnRepresentation) JSONArray() else null
     private fun function(name: String, body: JSONObject): JSONObject? = request("POST", "/functions/v1/$name", body.toString())?.let(::JSONObject)
+    private fun patch(path: String, body: JSONObject): Boolean = request("PATCH", path, body.toString()) != null
 
     private fun request(method: String, path: String, body: String?, returnRepresentation: Boolean = false): String? = runCatching {
         val encodedPath = path.replace(" ", URLEncoder.encode(" ", StandardCharsets.UTF_8.name()))

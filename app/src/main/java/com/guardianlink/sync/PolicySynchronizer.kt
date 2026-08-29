@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import com.guardianlink.enforcement.LocationService
 import com.guardianlink.enforcement.AppInventoryReporter
 import com.guardianlink.policy.PolicyStore
+import com.guardianlink.enforcement.UsageMonitor
+import android.app.AppOpsManager
 
 /** Downloads only the active policy and latest command. Local enforcement remains active if this fails. */
 class PolicySynchronizer(private val context: Context) {
@@ -16,6 +18,11 @@ class PolicySynchronizer(private val context: Context) {
         val api = session.api() ?: return false
         api.touchLastSeen()
         AppInventoryReporter(context).reportIfDue()
+        val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            ?.let { it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1).takeIf { value -> value >= 0 } }
+        val appOps = context.getSystemService(AppOpsManager::class.java)
+        val usageAllowed = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
+        api.reportHealth(battery, context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("permissions_unlocked", false), usageAllowed, if (usageAllowed) UsageMonitor(context).totalScreenMinutesToday() else 0)
         val store = PolicyStore(context)
         api.fetchActivePolicy()?.let { raw -> store.saveFromCloudJson(raw) }
         val updatedPolicy = store.load()
@@ -30,6 +37,7 @@ class PolicySynchronizer(private val context: Context) {
                 command.expiresAtEpochMs != null && command.expiresAtEpochMs < System.currentTimeMillis() -> api.acknowledge(command.id, "expired")
                 command.type == "pause" -> { store.setPause(command.expiresAtEpochMs, command.scope == "all_child_apps"); api.acknowledge(command.id, "applied") }
                 command.type == "resume" -> { store.resume(); api.acknowledge(command.id, "applied") }
+                command.type == "grant_time" -> { store.addDailyBonusMinutes(command.payload.optInt("minutes", 0)); api.acknowledge(command.id, "applied") }
                 else -> api.acknowledge(command.id, "received")
             }
             session.markHandled(command.id)

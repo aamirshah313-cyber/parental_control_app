@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class RemoteCommand(val id: String, val type: String, val scope: String, val expiresAtEpochMs: Long?)
+data class RemoteCommand(val id: String, val type: String, val scope: String, val expiresAtEpochMs: Long?, val payload: JSONObject = JSONObject())
 data class ReportedAppPayload(val packageName: String, val displayName: String, val pendingApproval: Boolean? = null)
 data class ChildQuickMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
 
@@ -23,11 +23,11 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
 
     fun fetchLatestCommand(): RemoteCommand? {
         if (!enabled) return null
-        val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&order=created_at.desc&limit=1&select=id,command_type,scope,expires_at") ?: return null
+        val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&order=created_at.desc&limit=1&select=id,command_type,scope,expires_at,payload") ?: return null
         if (records.length() == 0) return null
         val command = records.getJSONObject(0)
         val expiry = command.optString("expires_at").takeIf { it.isNotBlank() }?.let { java.time.Instant.parse(it).toEpochMilli() }
-        return RemoteCommand(command.getString("id"), command.getString("command_type"), command.optString("scope", "managed_apps"), expiry)
+        return RemoteCommand(command.getString("id"), command.getString("command_type"), command.optString("scope", "managed_apps"), expiry, command.optJSONObject("payload") ?: JSONObject())
     }
 
     fun acknowledge(commandId: String, status: String) {
@@ -86,6 +86,22 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
             put("family_id", familyRows.getJSONObject(0).getString("family_id")); put("device_id", deviceId)
             put("sender_role", "child"); put("template_key", templateKey); put("body", body)
         }.toString()) != null
+    }
+
+    fun requestMoreScreenTime(minutes: Int): Boolean {
+        if (!enabled || minutes !in 5..120) return false
+        return request("POST", "/rest/v1/child_time_requests", JSONObject().apply {
+            put("device_id", deviceId); put("request_type", "more_time"); put("requested_minutes", minutes)
+        }.toString()) != null
+    }
+
+    fun reportHealth(batteryPercent: Int?, protectionActive: Boolean, usageAccessAvailable: Boolean, screenMinutesToday: Int) {
+        if (!enabled) return
+        request("POST", "/rest/v1/device_health?on_conflict=device_id", JSONObject().apply {
+            put("device_id", deviceId); batteryPercent?.let { put("battery_percent", it.coerceIn(0, 100)) }
+            put("protection_active", protectionActive); put("usage_access_available", usageAccessAvailable)
+            put("screen_minutes_today", screenMinutesToday.coerceAtLeast(0)); put("reported_at", java.time.Instant.now().toString())
+        }.toString(), "resolution=merge-duplicates,return=minimal")
     }
 
     fun upsertReportedApps(apps: List<ReportedAppPayload>): Boolean {

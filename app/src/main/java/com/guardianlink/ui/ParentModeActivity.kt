@@ -244,17 +244,24 @@ class ParentModeActivity : android.app.Activity() {
             "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) },
             "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
         ))
-        content.addView(secondaryButton("Check command delivery") { checkCommandDelivery() })
+        content.addView(actionRow(
+            "Time requests" to { startActivity(TimeRequestsActivity.intent(this, device.id)) },
+            "Check delivery" to { checkCommandDelivery() }
+        ))
+        val health = note("Loading device health…")
+        content.addView(health)
+        loadDeviceHealth(device, health)
 
         content.addView(section("Rules"))
         val keywords = field("Blocked keywords (comma separated)").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
         val bedtimeEnabled = CheckBox(this).apply { text = "Enable daily bedtime"; isChecked = selectedPolicy.schedules.isNotEmpty() }
         val bedtimeStart = field("Bedtime starts (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.start?.toString() ?: "21:00") }
         val bedtimeEnd = field("Bedtime ends (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.end?.toString() ?: "07:00") }
+        val dailyAllowance = field("Daily screen-time allowance in minutes (0 = off)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.dailyScreenLimitMinutes.toString()) }
         val approval = CheckBox(this).apply { text = "Block newly installed apps until approved"; isChecked = selectedPolicy.requireAppApproval }
         val location = CheckBox(this).apply { text = "Enable visible child location sharing"; isChecked = selectedPolicy.locationEnabled }
         val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
-        listOf(keywords, bedtimeEnabled, bedtimeStart, bedtimeEnd, approval, location, interval).forEach(content::addView)
+        listOf(keywords, bedtimeEnabled, bedtimeStart, bedtimeEnd, dailyAllowance, approval, location, interval).forEach(content::addView)
         content.addView(button("Save and send rules") {
             val schedule = if (bedtimeEnabled.isChecked) runCatching {
                 listOf(ScheduleRule(DayOfWeek.entries.toSet(), LocalTime.parse(bedtimeStart.text.toString().trim()), LocalTime.parse(bedtimeEnd.text.toString().trim()), "Bedtime"))
@@ -262,6 +269,7 @@ class ParentModeActivity : android.app.Activity() {
             publishPolicy(selectedPolicy.copy(
                 blockedKeywords = keywords.text.toString().split(',').map(String::trim).filter(String::isNotBlank).toSet(),
                 schedules = schedule,
+                dailyScreenLimitMinutes = dailyAllowance.text.toString().toIntOrNull()?.coerceIn(0, 1_440) ?: 0,
                 requireAppApproval = approval.isChecked,
                 locationEnabled = location.isChecked,
                 locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15
@@ -305,6 +313,9 @@ class ParentModeActivity : android.app.Activity() {
             else publishPolicy(selectedPolicy.copy(safePlaces = selectedPolicy.safePlaces.filterNot { it.name.equals(place.name, true) } + place))
         })
         content.addView(button("Clear all safe places") { publishPolicy(selectedPolicy.copy(safePlaces = emptyList())) })
+        content.addView(section("Device lifecycle"))
+        content.addView(note("Retire removes this child device from this dashboard. It is safer than deleting history; the parent can no longer manage the retired entry."))
+        content.addView(secondaryButton("Retire this device") { confirmRetire(device) })
     }
 
     private fun refreshFamily() {
@@ -442,6 +453,39 @@ class ParentModeActivity : android.app.Activity() {
                         "Updated ${it.recordedAt.replace('T', ' ').substringBefore('.')} • ±${it.accuracyMeters?.let { meters -> "${meters.toInt()} m" } ?: "unknown"}"
                 } ?: "No shared location yet. Enable visible location sharing on the child device to receive the next check-in."
             }
+        }.start()
+    }
+
+    private fun loadDeviceHealth(device: DeviceRecord, target: TextView) {
+        val current = session ?: return
+        Thread {
+            val health = ParentApi(usableParentSession(current)).deviceHealth(device.id)
+            runOnUiThread {
+                target.text = health?.let {
+                    val battery = it.batteryPercent?.let { value -> "$value% battery" } ?: "battery unavailable"
+                    val protection = if (it.protectionActive) "protection enabled" else "protection setup incomplete"
+                    val access = if (it.usageAccessAvailable) "Usage Access ready" else "Usage Access needs attention"
+                    "$battery • $protection\n$access • ${it.screenMinutesToday} minutes used today\nReported ${it.reportedAt.replace('T', ' ').substringBefore('.')}"
+                } ?: "No health check-in yet. Open the child app and sync once after completing protection setup."
+            }
+        }.start()
+    }
+
+    private fun confirmRetire(device: DeviceRecord) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Retire ${device.displayName}?")
+            .setMessage("It will disappear from this dashboard. This does not erase stored safety records and cannot be undone from the app.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Retire") { _, _ -> retireDevice(device) }
+            .show()
+    }
+
+    private fun retireDevice(device: DeviceRecord) {
+        val current = session ?: return
+        setStatus("Retiring ${device.displayName}…")
+        Thread {
+            val ok = ParentApi(usableParentSession(current)).retireDevice(device.id)
+            runOnUiThread { if (ok) { selectedDevice = null; setStatus("Device retired."); refreshFamily() } else setStatus("Could not retire this device.") }
         }.start()
     }
 

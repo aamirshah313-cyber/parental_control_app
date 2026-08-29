@@ -6,10 +6,13 @@ import com.guardianlink.BuildConfig
 import java.time.LocalDateTime
 
 class PolicyEngine {
-    fun appDecision(policy: ChildPolicy, packageName: String, usedTodayMinutes: Int, now: LocalDateTime = LocalDateTime.now()): EnforcementDecision {
+    fun appDecision(policy: ChildPolicy, packageName: String, usedTodayMinutes: Int, totalTodayMinutes: Int = 0, now: LocalDateTime = LocalDateTime.now()): EnforcementDecision {
         val pauseActive = policy.paused && (policy.pauseUntilEpochMs == null || System.currentTimeMillis() < policy.pauseUntilEpochMs)
         if (pauseActive && (policy.pauseAllApps && !isEssentialPackage(packageName) || packageName in policy.managedPackages)) return EnforcementDecision(true, "Paused by your parent")
         if (packageName in policy.blockedPackages) return EnforcementDecision(true, "This app is blocked")
+        if (policy.dailyScreenLimitMinutes > 0 && totalTodayMinutes >= policy.dailyScreenLimitMinutes && !isEssentialPackage(packageName)) {
+            return EnforcementDecision(true, "Daily screen-time allowance reached")
+        }
         if (packageName !in policy.managedPackages) return EnforcementDecision(false)
         policy.schedules.firstOrNull { schedule ->
             isWithinSchedule(now, schedule)

@@ -32,6 +32,8 @@ data class ChildPolicy(
     val blockedPackages: Set<String> = emptySet(),
     val schedules: List<ScheduleRule> = emptyList(),
     val appLimits: List<AppLimit> = emptyList(),
+    /** Whole-device daily allowance. Zero means no whole-device allowance is set. */
+    val dailyScreenLimitMinutes: Int = 0,
     val blockedDomains: Set<String> = emptySet(),
     val blockedKeywords: Set<String> = emptySet(),
     val blockYoutubeShorts: Boolean = true,

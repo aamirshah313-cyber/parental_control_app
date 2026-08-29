@@ -49,7 +49,9 @@ class ProtectionService : Service() {
         val packageName = monitor.currentForegroundPackage() ?: return
         if (packageName == applicationContext.packageName) return
         val policy = store.load()
-        val decision = engine.appDecision(policy, packageName, monitor.usedMinutesToday(packageName))
+        val allowance = policy.dailyScreenLimitMinutes + store.dailyBonusMinutes()
+        val effectivePolicy = if (allowance == policy.dailyScreenLimitMinutes) policy else policy.copy(dailyScreenLimitMinutes = allowance)
+        val decision = engine.appDecision(effectivePolicy, packageName, monitor.usedMinutesToday(packageName), monitor.totalScreenMinutesToday())
         if (decision.blocked && packageName != lastBlockedPackage) {
             lastBlockedPackage = packageName
             startActivity(BlockingActivity.intent(this, decision.reason ?: "Unavailable", packageName))

@@ -91,6 +91,10 @@ class ChildModeActivity : android.app.Activity() {
             setOnClickListener { startLocationSharingAfterSetup() }
         })
         root.addView(Button(this).apply {
+            text = "Ask parent for extra screen time"
+            setOnClickListener { requestMoreTime() }
+        })
+        root.addView(Button(this).apply {
             text = "SOS — alert parent"
             setOnClickListener { sendSos() }
         })
@@ -138,6 +142,22 @@ class ChildModeActivity : android.app.Activity() {
         }.start()
     }
 
+    private fun requestMoreTime() {
+        val session = DeviceSessionStore(this)
+        if (!session.isPaired()) { status.text = "Pair this child phone before requesting extra time."; return }
+        val options = intArrayOf(15, 30, 45, 60)
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Ask for extra time")
+            .setMessage("Choose how much additional screen time you need today. Your parent decides whether to grant it.")
+            .setItems(options.map { "$it minutes" }.toTypedArray()) { _, which ->
+                status.text = "Sending time request…"
+                Thread {
+                    val sent = session.api()?.requestMoreScreenTime(options[which]) == true
+                    runOnUiThread { status.text = if (sent) "Request sent. Check again after your parent responds and this device syncs." else "Could not send request. Check your internet connection and run the professional controls migration." }
+                }.start()
+            }.setNegativeButton("Cancel", null).show()
+    }
+
     private fun styleControls(root: LinearLayout) {
         for (index in 0 until root.childCount) {
             when (val child = root.getChildAt(index)) {
@@ -145,7 +165,7 @@ class ChildModeActivity : android.app.Activity() {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
                         text.toString().startsWith("SOS") -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(190, 45, 65)) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
+                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
                         else -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }

@@ -17,6 +17,7 @@
         <activity android:name=".ui.BlockingActivity" android:excludeFromRecents="true" android:exported="false" />
         <activity android:name=".ui.ActivityTimelineActivity" android:exported="false" />
         <activity android:name=".ui.ManageAppsActivity" android:exported="false" />
+        <activity android:name=".ui.TimeRequestsActivity" android:exported="false" />
         <activity android:name=".ui.LocationLogActivity" android:exported="false" />
         <activity android:name=".ui.QuickMessagesActivity" android:exported="false" />
         <activity android:name=".ui.HowToUseActivity" android:exported="false" />

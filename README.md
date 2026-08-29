@@ -9,7 +9,9 @@ This repository contains no personal email, password, family ID, Supabase projec
 - Parent account sign-in and self-service account creation.
 - One-time parent/child pairing codes and multi-child families.
 - Parent controls for pause, schedules, selected-app blocking, new-app approval, and supervised browser rules.
+- Daily screen-time allowance, selected-app daily limits, and parent-approved one-day bonus time.
 - Explicit, visible child location sharing, safe places, activity history, and SOS alerts.
+- Child-device health status (battery, Usage Access, protection setup, and today's screen time) plus soft device retirement.
 - Offline enforcement of previously downloaded rules.
 - Android Keystore encryption for local parent and child session tokens.
 
@@ -37,12 +39,14 @@ Run these SQL files in the Supabase SQL Editor, in order:
 3. [`supabase/migrations/20260828_sos_alert.sql`](supabase/migrations/20260828_sos_alert.sql)
 4. [`supabase/migrations/20260828_reported_apps.sql`](supabase/migrations/20260828_reported_apps.sql)
 5. [`supabase/migrations/20260829_family_quick_messages.sql`](supabase/migrations/20260829_family_quick_messages.sql)
+6. [`supabase/migrations/20260829_professional_controls.sql`](supabase/migrations/20260829_professional_controls.sql)
 
 Deploy the Edge Functions:
 
 ```powershell
 npx supabase@latest functions deploy create-pairing --use-api
 npx supabase@latest functions deploy claim-child-device --no-verify-jwt --use-api
+npx supabase@latest functions deploy retire-device --use-api
 ```
 
 In Supabase Auth, enable email/password sign-up. If email confirmation is enabled, new parents confirm their email before their first sign-in.
@@ -72,6 +76,10 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 - YouTube Shorts/keyword filtering is reliable in the supervised browser; it cannot selectively inspect the official YouTube app.
 - Location is opt-in and visibly indicated by an Android foreground-service notification.
 - Do not use the app for hidden monitoring, private-message capture, keystroke logging, camera/microphone collection, or screenshots.
+
+## Production upgrades
+
+Before enabling low-latency notifications or Device Owner mode, follow [`docs/PRODUCTION_DELIVERY_AND_DEVICE_OWNER.md`](docs/PRODUCTION_DELIVERY_AND_DEVICE_OWNER.md). These capabilities require project-specific Firebase credentials and/or a reset dedicated child device; they cannot be safely enabled from a normal installed APK.
 
 ## Before public distribution
 

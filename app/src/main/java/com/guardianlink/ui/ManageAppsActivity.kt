@@ -3,13 +3,16 @@ package com.guardianlink.ui
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.text.InputType
 import android.os.Bundle
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
 import com.guardianlink.model.ChildPolicy
+import com.guardianlink.model.AppLimit
 import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
 import com.guardianlink.sync.ReportedApp
@@ -62,6 +65,7 @@ class ManageAppsActivity : android.app.Activity() {
             val state = when {
                 app.packageName in policy.blockedPackages -> "Blocked"
                 app.pendingApproval && app.packageName !in policy.approvedPackages -> "Awaiting approval"
+                policy.appLimits.firstOrNull { it.packageName == app.packageName } != null -> "${policy.appLimits.first { it.packageName == app.packageName }.dailyMinutes} min/day"
                 app.packageName in policy.managedPackages -> "Managed"
                 else -> "Allowed"
             }
@@ -81,6 +85,21 @@ class ManageAppsActivity : android.app.Activity() {
         content.addView(actionRow(
             "Add to pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } },
             "Remove from pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages - chosen()) } }
+        ))
+        content.addView(TextView(this).apply { text = "Daily limits"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(18), 0, dp(4)) })
+        content.addView(TextView(this).apply { text = "Apply a daily limit to every selected app. It works alongside bedtime and instant pause."; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(6)) })
+        val dailyMinutes = EditText(this).apply {
+            hint = "Minutes per day (5–720)"; inputType = InputType.TYPE_CLASS_NUMBER
+            setPadding(dp(14), dp(4), dp(14), dp(4)); background = android.graphics.drawable.GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(196, 208, 225)) }
+        }
+        content.addView(dailyMinutes)
+        content.addView(actionRow(
+            "Set selected limit" to {
+                val minutes = dailyMinutes.text.toString().toIntOrNull()?.coerceIn(5, 720)
+                if (minutes == null) status.text = "Enter a daily limit from 5 to 720 minutes."
+                else updatePolicy { current -> current.copy(appLimits = current.appLimits.filterNot { it.packageName in chosen() } + chosen().map { AppLimit(it, minutes) }) }
+            },
+            "Clear selected limits" to { updatePolicy { current -> current.copy(appLimits = current.appLimits.filterNot { it.packageName in chosen() }) } }
         ))
     }
 
