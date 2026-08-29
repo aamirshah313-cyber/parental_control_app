@@ -34,6 +34,7 @@ class ChildModeActivity : android.app.Activity() {
         root.addView(TextView(this).apply { text = "CHILD DEVICE SETUP"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(19, 102, 214)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
         root.addView(TextView(this).apply { text = "Set up protection together"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(17, 43, 78)); setPadding(0, dp(5), 0, dp(4)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
         root.addView(TextView(this).apply { text = "Pair this phone first. Android permissions are requested only in the final activation step."; textSize = 14f; setTextColor(Color.rgb(70, 82, 102)); setPadding(0, 0, 0, dp(12)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
+        root.addView(Button(this).apply { text = "How to use this child device"; setOnClickListener { startActivity(HowToUseActivity.childIntent(this@ChildModeActivity)) } })
 
         root.addView(stepHeader("1", "Pair this child phone", "Paste the single-use code shown in the parent dashboard."))
         val pairingCode = EditText(this).apply { hint = "Paste one-time pairing code"; setSingleLine() }
@@ -144,7 +145,7 @@ class ChildModeActivity : android.app.Activity() {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
                         text.toString().startsWith("SOS") -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(190, 45, 65)) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
+                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
                         else -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }

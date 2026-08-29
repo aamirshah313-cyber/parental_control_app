@@ -216,6 +216,7 @@ class ParentModeActivity : android.app.Activity() {
             "Pair a child" to { showPairingDialog() },
             "Alerts" to { showAlertControls() }
         ))
+        content.addView(secondaryButton("How to use this dashboard") { startActivity(HowToUseActivity.parentIntent(this)) })
         content.addView(secondaryButton("Refresh dashboard") { refreshFamily() })
 
         content.addView(section("Child devices"))
