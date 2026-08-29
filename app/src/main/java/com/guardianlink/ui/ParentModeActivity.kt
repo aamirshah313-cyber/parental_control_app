@@ -278,17 +278,37 @@ class ParentModeActivity : android.app.Activity() {
             }
         ))
         content.addView(section("Location & emergency"))
+        val location = CheckBox(this).apply { text = "Enable visible child location sharing"; isChecked = selectedPolicy.locationEnabled }
+        val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
+        content.addView(location); content.addView(interval)
+        content.addView(button("Save location sharing") {
+            publishPolicy(selectedPolicy.copy(locationEnabled = location.isChecked, locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15))
+        })
         content.addView(actionRow(
             "Open live map" to { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) },
             "Location log" to { startActivity(LocationLogActivity.intent(this, device.id, device.displayName)) }
         ))
-        content.addView(actionRow(
-            "Safe-place settings" to { dashboardSection = DashboardSection.CONTROLS; refreshFamily() },
-            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) }
-        ))
+        content.addView(section("Safe places"))
+        content.addView(note(selectedPolicy.safePlaces.takeIf { it.isNotEmpty() }?.joinToString("\n") { "${it.name}: ${it.radiusMeters} m" } ?: "No safe places configured."))
+        val safeSearch = field("Search a place, for example Beaconhouse School Karachi")
+        val safeName = field("Safe-place name, for example School")
+        val safeLatitude = field("Latitude, for example 24.8607", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
+        val safeLongitude = field("Longitude, for example 67.0011", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
+        val safeRadius = field("Radius in metres (50–5000)", InputType.TYPE_CLASS_NUMBER).apply { setText("150") }
+        content.addView(safeSearch)
+        content.addView(button("Find place coordinates") { findPlace(safeSearch.text.toString(), safeName, safeLatitude, safeLongitude) })
+        listOf(safeName, safeLatitude, safeLongitude, safeRadius).forEach(content::addView)
+        content.addView(button("Use child's latest check-in as point") { useLatestLocationForSafePlace(safeLatitude, safeLongitude) })
+        content.addView(button("Preview safe place on map") { openMapPreview(safeLatitude.text.toString(), safeLongitude.text.toString()) })
+        content.addView(button("Add safe place") {
+            val place = runCatching { SafePlace(safeName.text.toString().trim().also { require(it.isNotBlank()) }, safeLatitude.text.toString().toDouble().also { require(it in -90.0..90.0) }, safeLongitude.text.toString().toDouble().also { require(it in -180.0..180.0) }, safeRadius.text.toString().toInt().coerceIn(50, 5_000)) }.getOrNull()
+            if (place == null) setStatus("Enter a name, valid latitude/longitude, and radius.")
+            else publishPolicy(selectedPolicy.copy(safePlaces = selectedPolicy.safePlaces.filterNot { it.name.equals(place.name, true) } + place))
+        })
+        content.addView(secondaryButton("Clear all safe places") { publishPolicy(selectedPolicy.copy(safePlaces = emptyList())) })
         content.addView(actionRow(
             "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } },
-            "Parent alerts" to { showAlertControls() }
+            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) }
         ))
     }
 
@@ -304,10 +324,6 @@ class ParentModeActivity : android.app.Activity() {
             "Resume access" to { sendCommand("resume", null) }
         ))
         content.addView(actionRow(
-            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) },
-            "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
-        ))
-        content.addView(actionRow(
             "Time requests" to { startActivity(TimeRequestsActivity.intent(this, device.id)) },
             "Check delivery" to { checkCommandDelivery() }
         ))
@@ -315,67 +331,27 @@ class ParentModeActivity : android.app.Activity() {
         content.addView(health)
         loadDeviceHealth(device, health)
 
-        content.addView(section("Rules"))
-        val keywords = field("Blocked keywords (comma separated)").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
+        content.addView(section("Time, access & approvals"))
         val bedtimeEnabled = CheckBox(this).apply { text = "Enable daily bedtime"; isChecked = selectedPolicy.schedules.isNotEmpty() }
         val bedtimeStart = field("Bedtime starts (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.start?.toString() ?: "21:00") }
         val bedtimeEnd = field("Bedtime ends (24-hour time)").apply { setText(selectedPolicy.schedules.firstOrNull()?.end?.toString() ?: "07:00") }
         val dailyAllowance = field("Daily screen-time allowance in minutes (0 = off)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.dailyScreenLimitMinutes.toString()) }
         val approval = CheckBox(this).apply { text = "Block newly installed apps until approved"; isChecked = selectedPolicy.requireAppApproval }
-        val location = CheckBox(this).apply { text = "Enable visible child location sharing"; isChecked = selectedPolicy.locationEnabled }
-        val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
-        listOf(keywords, bedtimeEnabled, bedtimeStart, bedtimeEnd, dailyAllowance, approval, location, interval).forEach(content::addView)
+        listOf(bedtimeEnabled, bedtimeStart, bedtimeEnd, dailyAllowance, approval).forEach(content::addView)
         content.addView(button("Save and send rules") {
             val schedule = if (bedtimeEnabled.isChecked) runCatching {
                 listOf(ScheduleRule(DayOfWeek.entries.toSet(), LocalTime.parse(bedtimeStart.text.toString().trim()), LocalTime.parse(bedtimeEnd.text.toString().trim()), "Bedtime"))
             }.getOrElse { setStatus("Use valid times such as 21:00 and 07:00."); return@button } else emptyList()
             publishPolicy(selectedPolicy.copy(
-                blockedKeywords = keywords.text.toString().split(',').map(String::trim).filter(String::isNotBlank).toSet(),
                 schedules = schedule,
                 dailyScreenLimitMinutes = dailyAllowance.text.toString().toIntOrNull()?.coerceIn(0, 1_440) ?: 0,
-                requireAppApproval = approval.isChecked,
-                locationEnabled = location.isChecked,
-                locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15
+                requireAppApproval = approval.isChecked
             ))
         })
 
         content.addView(section("App approvals and selected-app controls"))
         content.addView(note("Review the child’s reported apps, including apps waiting for approval. Select multiple apps to allow, block, or include in a managed pause."))
         content.addView(button("Manage child apps") { startActivity(ManageAppsActivity.intent(this, device.id)) })
-        content.addView(section("Latest shared position"))
-        val latestLocation = note("Loading the latest shared check-in…")
-        content.addView(latestLocation)
-        content.addView(actionRow(
-            "Open live map" to { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) },
-            "Location log" to { startActivity(LocationLogActivity.intent(this, device.id, device.displayName)) }
-        ))
-        loadLatestLocationPreview(device, latestLocation)
-
-        content.addView(section("Safe places"))
-        content.addView(note(selectedPolicy.safePlaces.takeIf { it.isNotEmpty() }?.joinToString("\n") { "${it.name}: ${it.radiusMeters} m" } ?: "No safe places configured."))
-        val safeSearch = field("Search a place, for example Beaconhouse School Karachi")
-        val safeName = field("Safe-place name, for example School")
-        val safeLatitude = field("Latitude, for example 24.8607", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
-        val safeLongitude = field("Longitude, for example 67.0011", InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED)
-        val safeRadius = field("Radius in metres (50–5000)", InputType.TYPE_CLASS_NUMBER).apply { setText("150") }
-        content.addView(safeSearch)
-        content.addView(button("Find place coordinates") { findPlace(safeSearch.text.toString(), safeName, safeLatitude, safeLongitude) })
-        listOf(safeName, safeLatitude, safeLongitude, safeRadius).forEach(content::addView)
-        content.addView(button("Use child's latest check-in as point") { useLatestLocationForSafePlace(safeLatitude, safeLongitude) })
-        content.addView(button("Preview safe place on map") { openMapPreview(safeLatitude.text.toString(), safeLongitude.text.toString()) })
-        content.addView(button("Add safe place") {
-            val place = runCatching {
-                SafePlace(
-                    safeName.text.toString().trim().also { require(it.isNotBlank()) },
-                    safeLatitude.text.toString().toDouble().also { require(it in -90.0..90.0) },
-                    safeLongitude.text.toString().toDouble().also { require(it in -180.0..180.0) },
-                    safeRadius.text.toString().toInt().coerceIn(50, 5_000)
-                )
-            }.getOrNull()
-            if (place == null) setStatus("Enter a name, valid latitude/longitude, and radius.")
-            else publishPolicy(selectedPolicy.copy(safePlaces = selectedPolicy.safePlaces.filterNot { it.name.equals(place.name, true) } + place))
-        })
-        content.addView(button("Clear all safe places") { publishPolicy(selectedPolicy.copy(safePlaces = emptyList())) })
         content.addView(section("Device lifecycle"))
         content.addView(note("Retire removes this child device from this dashboard. It is safer than deleting history; the parent can no longer manage the retired entry."))
         content.addView(secondaryButton("Retire this device") { confirmRetire(device) })
