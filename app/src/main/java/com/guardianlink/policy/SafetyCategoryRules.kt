@@ -39,7 +39,10 @@ object SafetyCategoryRules {
     fun matchingCategory(categories: Set<SafetyCategory>, url: String, titleOrVisibleText: String): SafetyCategory? {
         if (categories.isEmpty()) return null
         val host = runCatching { java.net.URI(url).host.orEmpty().lowercase() }.getOrDefault("")
-        val page = "$url $titleOrVisibleText".lowercase()
+        // Search engines encode spaces as + or %20. Decode the URL before checking terms so a
+        // protected search is stopped before its results page is rendered.
+        val readableUrl = runCatching { java.net.URLDecoder.decode(url, "UTF-8") }.getOrDefault(url).replace('+', ' ')
+        val page = "$readableUrl $titleOrVisibleText".lowercase()
         return categories.sortedBy { it.ordinal }.firstOrNull { category ->
             val rule = rules.getValue(category)
             rule.domains.any { domain -> host == domain || host.endsWith(".$domain") } ||
