@@ -15,12 +15,14 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.guardianlink.policy.PolicyEngine
 import com.guardianlink.policy.PolicyStore
+import com.guardianlink.sync.PolicySynchronizer
 import org.json.JSONTokener
 
 /** Visible child browser. It can be selected as Android's default browser for normal web links. */
 class SafeBrowserActivity : android.app.Activity() {
     private lateinit var browser: WebView
     private lateinit var address: EditText
+    private lateinit var status: TextView
     private val store by lazy { PolicyStore(this) }
     private val engine = PolicyEngine()
 
@@ -32,11 +34,14 @@ class SafeBrowserActivity : android.app.Activity() {
         val back = Button(this).apply { text = "‹"; textSize = 24f; isAllCaps = false; setOnClickListener { if (browser.canGoBack()) browser.goBack() } }
         address = EditText(this).apply { hint = "Search or enter website"; setSingleLine(); textSize = 15f; background = rounded(0xFFF2F5F9.toInt()) }
         val go = Button(this).apply { text = "Go"; isAllCaps = false; setOnClickListener { load(address.text.toString()) } }
+        val sync = Button(this).apply { text = "Sync"; textSize = 12f; isAllCaps = false; setOnClickListener { syncRules(true) } }
         bar.addView(back, LinearLayout.LayoutParams(dp(48), dp(48)))
         bar.addView(address, LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, dp(4), 0) })
-        bar.addView(go, LinearLayout.LayoutParams(dp(58), dp(48)))
+        bar.addView(go, LinearLayout.LayoutParams(dp(52), dp(48)))
+        bar.addView(sync, LinearLayout.LayoutParams(dp(58), dp(48)))
         root.addView(bar)
-        root.addView(TextView(this).apply { text = "Family browser • Websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(2), dp(14), dp(6)) })
+        status = TextView(this).apply { text = "Family browser • Websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(Color.rgb(70, 82, 102)); setPadding(dp(14), dp(2), dp(14), dp(6)) }
+        root.addView(status)
         browser = WebView(this).apply {
             settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = true
             webViewClient = FilterClient()
@@ -44,6 +49,7 @@ class SafeBrowserActivity : android.app.Activity() {
         root.addView(browser, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
         load(incomingUrl(intent) ?: "https://www.google.com")
+        syncRules(false)
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); incomingUrl(intent)?.let(::load) }
@@ -59,6 +65,17 @@ class SafeBrowserActivity : android.app.Activity() {
         }
         address.setText(url)
         browser.loadUrl(url)
+    }
+
+    private fun syncRules(showResult: Boolean) {
+        if (showResult) status.text = "Checking for the latest family rules…"
+        Thread {
+            val synced = PolicySynchronizer(this).sync()
+            runOnUiThread {
+                if (showResult || synced) status.text = if (synced) "Family rules are up to date." else "Could not sync now; the last downloaded family rules remain active."
+                if (synced && ::browser.isInitialized) browser.reload()
+            }
+        }.start()
     }
 
     private fun enforce(url: String, visibleText: String) {

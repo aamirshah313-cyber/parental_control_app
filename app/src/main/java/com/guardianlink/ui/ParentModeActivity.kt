@@ -267,10 +267,11 @@ class ParentModeActivity : android.app.Activity() {
     private fun buildSafetyCenter(device: DeviceRecord) {
         content.addView(section("${device.displayName} safety"))
         content.addView(note("Browser rules apply in the Family Browser. Make it the default browser on the child phone to have ordinary web links open there."))
+        content.addView(note("Test path: save a rule here, then on the child phone open Family Browser and tap Sync before searching the blocked word."))
         val keywords = field("Blocked words or phrases, separated by commas").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
         content.addView(keywords)
         content.addView(actionRow(
-            "Save browser rules" to { publishPolicy(selectedPolicy.copy(blockedKeywords = keywords.text.toString().split(',').map(String::trim).filter(String::isNotBlank).toSet())) },
+            "Save browser rules" to { publishPolicy(selectedPolicy.copy(blockedKeywords = keywords.text.toString().split(',').map(String::trim).filter(String::isNotBlank).toSet())); setStatus("Browser rules sent. On the child phone, open Family Browser and tap Sync to test immediately.") },
             "Test rules" to {
                 val candidate = keywords.text.toString().split(',').map(String::trim).firstOrNull().orEmpty()
                 val result = if (candidate.isBlank()) "Add a word first." else PolicyEngine().pageDecision(selectedPolicy.copy(blockedKeywords = setOf(candidate)), "https://example.test", "Example page: $candidate").reason ?: "No match"
