@@ -27,6 +27,7 @@ import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSession
 import com.guardianlink.sync.ParentSessionStore
 import com.guardianlink.enforcement.SosAlertService
+import com.guardianlink.policy.PolicyEngine
 import com.guardianlink.R
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -41,9 +42,11 @@ class ParentModeActivity : android.app.Activity() {
     private var selectedDevice: DeviceRecord? = null
     private var selectedVersion = 0
     private var selectedPolicy = ChildPolicy()
+    private var dashboardSection = DashboardSection.OVERVIEW
     /** Kept only in memory: raw pairing codes must never be persisted after display. */
     private var lastPairingMessage: String? = null
     private var lastPairingCode: String? = null
+    private enum class DashboardSection { OVERVIEW, CONTROLS, SAFETY, FAMILY }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,16 +72,17 @@ class ParentModeActivity : android.app.Activity() {
     private fun buildSignIn() {
         content.removeAllViews()
         content.addView(eyebrow("PARENT PORTAL"))
-        content.addView(title("Your family, at a glance"))
-        content.addView(note("Sign in to your private dashboard. New parents can create an account in under a minute."))
+        content.addView(title("Create your private family space"))
+        content.addView(note("New here? Enter an email, choose an 8+ character password, confirm you are a guardian, then tap Create parent account. Already registered? Enter the same email and password, then tap Sign in."))
         content.addView(secondaryButton("Read privacy and child-data notice") { showPrivacyNotice() })
         val email = field("Parent email", InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         val password = field("Password", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val confirmPassword = field("Confirm password (needed only for new account)", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         val guardianConsent = CheckBox(this).apply {
             text = "I confirm that I am the parent or legal guardian authorized to supervise this child device."
         }
         content.addView(section("Account details"))
-        content.addView(email); content.addView(password)
+        content.addView(email); content.addView(password); content.addView(confirmPassword)
         content.addView(guardianConsent)
         content.addView(button("Sign in") {
             setStatus("Signing in…")
@@ -94,6 +98,7 @@ class ParentModeActivity : android.app.Activity() {
             val emailText = email.text.toString().trim()
             val passwordText = password.text.toString()
             if (emailText.isBlank() || passwordText.length < 8) { setStatus("Enter an email and a password of at least 8 characters."); return@button }
+            if (passwordText != confirmPassword.text.toString()) { setStatus("The two passwords do not match."); return@button }
             if (!guardianConsent.isChecked) { setStatus("Confirm that you are authorized to supervise the child device before creating an account."); return@button }
             setStatus("Creating parent account…")
             Thread {
@@ -213,20 +218,78 @@ class ParentModeActivity : android.app.Activity() {
         startForegroundService(android.content.Intent(this, SosAlertService::class.java))
         content.addView(summaryCard(activeFamily.name, devices.size))
         content.addView(actionRow(
-            "Pair a child" to { showPairingDialog() },
-            "Alerts" to { showAlertControls() }
+            sectionLabel(DashboardSection.OVERVIEW) to { switchSection(DashboardSection.OVERVIEW, devices) },
+            sectionLabel(DashboardSection.CONTROLS) to { switchSection(DashboardSection.CONTROLS, devices) }
         ))
-        content.addView(secondaryButton("How to use this dashboard") { startActivity(HowToUseActivity.parentIntent(this)) })
-        content.addView(secondaryButton("Refresh dashboard") { refreshFamily() })
+        content.addView(actionRow(
+            sectionLabel(DashboardSection.SAFETY) to { switchSection(DashboardSection.SAFETY, devices) },
+            sectionLabel(DashboardSection.FAMILY) to { switchSection(DashboardSection.FAMILY, devices) }
+        ))
+        when (dashboardSection) {
+            DashboardSection.OVERVIEW -> buildOverview(devices)
+            DashboardSection.CONTROLS -> selectedDevice?.let(::buildDeviceControls) ?: run { content.addView(note("Choose a child from Overview before opening controls.")) }
+            DashboardSection.SAFETY -> selectedDevice?.let(::buildSafetyCenter) ?: run { content.addView(note("Choose a child from Overview before opening safety controls.")) }
+            DashboardSection.FAMILY -> buildFamilyCenter(devices)
+        }
+        addStatus()
+    }
 
-        content.addView(section("Child devices"))
-        if (devices.isEmpty()) content.addView(note("No child device paired yet. Use “Pair a child” to create a one-time code."))
+    private fun sectionLabel(section: DashboardSection) = if (dashboardSection == section) "• ${section.name.lowercase().replaceFirstChar { it.uppercase() }}" else section.name.lowercase().replaceFirstChar { it.uppercase() }
+    private fun switchSection(section: DashboardSection, devices: List<DeviceRecord>) { dashboardSection = section; buildDashboard(devices) }
+
+    private fun buildOverview(devices: List<DeviceRecord>) {
+        content.addView(actionRow("Refresh" to { refreshFamily() }, "Pair a child" to { showPairingDialog() }))
+        content.addView(section("Your child devices"))
+        if (devices.isEmpty()) content.addView(note("No child device paired yet. Pair a child first, then complete child setup."))
         devices.forEach { device ->
             val seen = device.lastSeenAt?.replace('T', ' ')?.substringBefore('.') ?: "not yet reported"
             content.addView(deviceCard(device.displayName, seen, selectedDevice?.id == device.id) { selectDevice(device) })
         }
-        selectedDevice?.let { device -> buildDeviceControls(device) }
-        addStatus()
+        selectedDevice?.let { device ->
+            content.addView(section("${device.displayName} at a glance"))
+            val health = note("Loading device health…")
+            content.addView(health); loadDeviceHealth(device, health)
+            val latest = note("Loading latest shared position…")
+            content.addView(latest); loadLatestLocationPreview(device, latest)
+            content.addView(actionRow("Open controls" to { switchSection(DashboardSection.CONTROLS, devices) }, "Open safety" to { switchSection(DashboardSection.SAFETY, devices) }))
+        }
+    }
+
+    private fun buildFamilyCenter(devices: List<DeviceRecord>) {
+        content.addView(section("Family setup & alerts"))
+        content.addView(note("Pair a child once, keep parent alerts enabled, and use this area for account-level actions."))
+        content.addView(actionRow("Pair a child" to { showPairingDialog() }, "Parent alerts" to { showAlertControls() }))
+        content.addView(secondaryButton("How to use this dashboard") { startActivity(HowToUseActivity.parentIntent(this)) })
+        content.addView(secondaryButton("Refresh family status") { refreshFamily() })
+        content.addView(secondaryButton("Sign out") { signOut() })
+    }
+
+    private fun buildSafetyCenter(device: DeviceRecord) {
+        content.addView(section("${device.displayName} safety"))
+        content.addView(note("Browser rules apply in the Family Browser. Make it the default browser on the child phone to have ordinary web links open there."))
+        val keywords = field("Blocked words or phrases, separated by commas").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
+        content.addView(keywords)
+        content.addView(actionRow(
+            "Save browser rules" to { publishPolicy(selectedPolicy.copy(blockedKeywords = keywords.text.toString().split(',').map(String::trim).filter(String::isNotBlank).toSet())) },
+            "Test rules" to {
+                val candidate = keywords.text.toString().split(',').map(String::trim).firstOrNull().orEmpty()
+                val result = if (candidate.isBlank()) "Add a word first." else PolicyEngine().pageDecision(selectedPolicy.copy(blockedKeywords = setOf(candidate)), "https://example.test", "Example page: $candidate").reason ?: "No match"
+                setStatus("Browser rule test: $result")
+            }
+        ))
+        content.addView(section("Location & emergency"))
+        content.addView(actionRow(
+            "Open live map" to { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) },
+            "Location log" to { startActivity(LocationLogActivity.intent(this, device.id, device.displayName)) }
+        ))
+        content.addView(actionRow(
+            "Safe-place settings" to { dashboardSection = DashboardSection.CONTROLS; refreshFamily() },
+            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) }
+        ))
+        content.addView(actionRow(
+            "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } },
+            "Parent alerts" to { showAlertControls() }
+        ))
     }
 
     private fun buildDeviceControls(device: DeviceRecord) {

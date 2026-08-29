@@ -1,90 +1,86 @@
 package com.guardianlink.ui
 
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.guardianlink.R
 
-/** Read-only feature tour. It never contacts Supabase or displays family data. */
+/** A local, interactive product preview. It contains no account, child, or location data. */
 class GuestPreviewActivity : android.app.Activity() {
+    private lateinit var content: LinearLayout
+    private lateinit var status: TextView
+    private var paused = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(24), dp(20), dp(28))
-            setBackgroundColor(BACKGROUND)
-        }
+        content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(24), dp(20), dp(28)); setBackgroundColor(BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(BACKGROUND); addView(content) })
-
-        content.addView(TextView(this).apply {
-            text = "EXPLORE SAFELY"
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = .12f
-            setTextColor(BLUE)
-        })
-        content.addView(TextView(this).apply {
-            text = "A calmer way to guide digital life"
-            textSize = 28f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(NAVY)
-            setPadding(0, dp(6), 0, dp(8))
-        })
-        content.addView(TextView(this).apply {
-            text = "This is a read-only tour. No account, child device, or location information is shown."
-            textSize = 15f
-            setTextColor(MUTED)
-            setPadding(0, 0, 0, dp(16))
-        })
-        content.addView(featureCard("One clear family dashboard", "See a child’s latest shared position, protection state, and important safety events without opening multiple screens."))
-        content.addView(featureCard("Thoughtful controls", "Pause access now, set bedtime, approve new apps, and manage selected apps from focused controls."))
-        content.addView(featureCard("Visible safety features", "Location sharing remains visible on the child phone. SOS alerts are designed to get the parent’s attention quickly."))
-        content.addView(featureCard("Privacy by design", "No message capture, hidden tracking, microphone recording, or browsing-history surveillance."))
-        content.addView(Button(this).apply {
-            text = "Create or sign in as a parent"
-            isAllCaps = false
-            textSize = 16f
-            minHeight = dp(52)
-            setTextColor(Color.WHITE)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(BLUE)
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(16), 0, 0) }
-            setOnClickListener { startActivity(android.content.Intent(this@GuestPreviewActivity, ParentModeActivity::class.java)) }
-        })
-        content.addView(Button(this).apply {
-            text = "Back to welcome"
-            isAllCaps = false
-            textSize = 15f
-            setTextColor(BLUE)
-            background = outlined()
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
-            setOnClickListener { finish() }
-        })
+        showWelcome()
     }
 
-    private fun featureCard(title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(16), dp(15), dp(16), dp(15))
-        background = rounded(Color.WHITE, BORDER)
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(6), 0, dp(4)) }
-        addView(TextView(this@GuestPreviewActivity).apply { text = title; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY) })
-        addView(TextView(this@GuestPreviewActivity).apply { text = body; textSize = 14f; setTextColor(MUTED); setPadding(0, dp(5), 0, 0) })
+    private fun showWelcome() {
+        content.removeAllViews()
+        content.addView(eyebrow("INTERACTIVE PREVIEW"))
+        content.addView(title("Try the parent dashboard"))
+        content.addView(note("This simulated dashboard lets you explore the layout and controls. It is local to this phone—nothing is saved or sent."))
+        content.addView(primary("Open interactive demo") { showDashboard() })
+        content.addView(secondary("Create or sign in as a parent") { startActivity(android.content.Intent(this, ParentModeActivity::class.java)) })
+        content.addView(secondary("Back to welcome") { finish() })
     }
 
-    private fun outlined() = GradientDrawable().apply { setColor(Color.TRANSPARENT); cornerRadius = dp(14).toFloat(); setStroke(dp(1), BLUE) }
-    private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(18).toFloat(); setStroke(dp(1), stroke) }
+    private fun showDashboard() {
+        content.removeAllViews()
+        content.addView(eyebrow("DEMO • FAMILY DASHBOARD"))
+        content.addView(title("Good afternoon, Sam"))
+        content.addView(note("Demo family • 1 child device linked • This is what a real parent sees after pairing."))
+        content.addView(navRow("Overview" to { showDashboard() }, "Controls" to { showControls() }))
+        content.addView(navRow("Safety" to { showSafety() }, "Family" to { showWelcome() }))
+        content.addView(section("Maya’s phone"))
+        content.addView(note("Protection active • 42% battery\nLast check-in: just now • 68 minutes today"))
+        content.addView(navRow(if (paused) "Resume access" to { paused = false; showDashboard() } else "Pause all apps" to { paused = true; showDashboard() }, "View location" to { showSafety() }))
+        content.addView(section("Latest shared position"))
+        content.addView(note("School area • updated 3 minutes ago\nA real dashboard opens Google Maps only when location sharing is enabled."))
+        status = note(if (paused) "Demo: child access is paused." else "Demo: access is currently available.")
+        content.addView(status)
+    }
+
+    private fun showControls() {
+        content.removeAllViews(); content.addView(eyebrow("DEMO • CONTROLS")); content.addView(title("Maya’s controls")); content.addView(note("Each section has a single purpose. In the real app, changes are sent to the paired child device."))
+        content.addView(navRow("Pause & bedtime" to { paused = !paused; showControls() }, "App controls" to { showAppDemo() }))
+        content.addView(navRow("Daily allowance" to { showMessage("Demo: daily allowance editor opens here.") }, "Time requests" to { showMessage("Demo: parent can grant or decline extra time here.") }))
+        content.addView(note(if (paused) "Demo state: all child apps are paused." else "Demo state: access is available. Tap Pause & bedtime to preview an instant stop."))
+        content.addView(secondary("Back to overview") { showDashboard() })
+    }
+
+    private fun showAppDemo() {
+        content.removeAllViews(); content.addView(eyebrow("DEMO • APP CONTROLS")); content.addView(title("Manage installed apps")); content.addView(note("A real child device reports its launchable apps here. The parent can select one or many to allow, block, add to pause, or set a daily limit."))
+        listOf("YouTube — 30 min/day", "Chrome — Allowed", "Roblox — Awaiting approval").forEach { content.addView(note(it)) }
+        content.addView(navRow("Allow selected" to { showMessage("Demo: selected app allowed.") }, "Block selected" to { showMessage("Demo: selected app blocked.") }))
+        content.addView(secondary("Back to controls") { showControls() })
+    }
+
+    private fun showSafety() {
+        content.removeAllViews(); content.addView(eyebrow("DEMO • SAFETY")); content.addView(title("Safety & location")); content.addView(note("Location sharing, safe places, SOS, and family browser rules are grouped here. They are visible to the child and enabled only with the appropriate Android permissions."))
+        content.addView(navRow("Open map" to { showMessage("Demo: Google Maps opens for the latest shared position.") }, "Safe places" to { showMessage("Demo: school and home boundaries are managed here.") }))
+        content.addView(navRow("Browser rules" to { showMessage("Demo: website, YouTube Shorts, and keyword rules are configured here.") }, "SOS alerts" to { showMessage("Demo: SOS uses a visible parent alarm and notification.") }))
+        content.addView(secondary("Back to overview") { showDashboard() })
+    }
+
+    private fun showMessage(text: String) { android.app.AlertDialog.Builder(this).setMessage(text).setPositiveButton("OK", null).show() }
+    private fun eyebrow(text: String) = TextView(this).apply { this.text = text; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(BLUE) }
+    private fun title(text: String) = TextView(this).apply { this.text = text; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(6), 0, dp(8)) }
+    private fun section(text: String) = TextView(this).apply { this.text = text; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(18), 0, dp(6)) }
+    private fun note(text: String) = TextView(this).apply { this.text = text; textSize = 14f; setTextColor(MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(Color.WHITE, BORDER); layoutParams = margins(0, 8) }
+    private fun primary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(BLUE); setOnClickListener { action() }; layoutParams = margins(12, 0) }
+    private fun secondary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(BLUE); background = rounded(Color.WHITE, Color.rgb(171, 204, 244)); setOnClickListener { action() }; layoutParams = margins(8, 0) }
+    private fun navRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = margins(4, 0); addView(secondary(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) }); addView(secondary(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) }) }
+    private fun margins(top: Int, bottom: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, dp(bottom)) }
+    private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat(); setStroke(dp(1), stroke) }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-
-    private companion object {
-        const val BACKGROUND = 0xFFF6F8FC.toInt()
-        const val NAVY = 0xFF112B4E.toInt()
-        const val MUTED = 0xFF465266.toInt()
-        const val BLUE = 0xFF1366D6.toInt()
-        const val BORDER = 0xFFE0E5EE.toInt()
-    }
+    private companion object { const val BACKGROUND = 0xFFF6F8FC.toInt(); const val NAVY = 0xFF112B4E.toInt(); const val MUTED = 0xFF465266.toInt(); const val BLUE = 0xFF1366D6.toInt(); const val BORDER = 0xFFE0E5EE.toInt() }
 }

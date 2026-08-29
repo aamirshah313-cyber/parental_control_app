@@ -24,7 +24,15 @@
         <activity android:name=".ui.GuestPreviewActivity" android:exported="false" />
         <activity android:name=".ui.SosAlertActivity" android:exported="false" />
         <activity android:name=".ui.LiveLocationActivity" android:exported="false" />
-        <activity android:name=".ui.SafeBrowserActivity" android:exported="false" />
+        <activity android:name=".ui.SafeBrowserActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity>
         <activity android:name=".ui.ChildModeActivity" android:exported="false" />
         <activity android:name=".ui.ParentModeActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">

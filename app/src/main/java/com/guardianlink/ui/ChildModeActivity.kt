@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
+import android.app.role.RoleManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -17,6 +18,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.guardianlink.enforcement.LocationService
 import com.guardianlink.enforcement.ProtectionService
+import com.guardianlink.enforcement.AppInventoryReporter
 import com.guardianlink.sync.DeviceSessionStore
 import com.guardianlink.sync.PairingClient
 import com.guardianlink.sync.PolicySynchronizer
@@ -91,6 +93,10 @@ class ChildModeActivity : android.app.Activity() {
             setOnClickListener { startLocationSharingAfterSetup() }
         })
         root.addView(Button(this).apply {
+            text = "Refresh installed apps for parent"
+            setOnClickListener { refreshInstalledApps() }
+        })
+        root.addView(Button(this).apply {
             text = "Ask parent for extra screen time"
             setOnClickListener { requestMoreTime() }
         })
@@ -100,6 +106,7 @@ class ChildModeActivity : android.app.Activity() {
         })
         root.addView(Button(this).apply { text = "Quick messages with parent"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
+        root.addView(Button(this).apply { text = "Use this as default browser"; setOnClickListener { requestDefaultBrowser() } })
         status = TextView(this)
         root.addView(status)
         styleControls(root)
@@ -158,6 +165,28 @@ class ChildModeActivity : android.app.Activity() {
             }.setNegativeButton("Cancel", null).show()
     }
 
+    private fun refreshInstalledApps() {
+        if (!DeviceSessionStore(this).isPaired()) { status.text = "Pair this device before sending its app list."; return }
+        status.text = "Refreshing installed apps for parent…"
+        Thread {
+            val sent = AppInventoryReporter(this).reportNow()
+            runOnUiThread { status.text = if (sent) "App list sent. The parent can now open Manage child apps and allow, block, pause, or set a limit." else "Could not send the app list. Check the internet connection, then try again." }
+        }.start()
+    }
+
+    private fun requestDefaultBrowser() {
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            val roles = getSystemService(RoleManager::class.java)
+            if (roles.isRoleAvailable(RoleManager.ROLE_BROWSER) && !roles.isRoleHeld(RoleManager.ROLE_BROWSER)) {
+                startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_BROWSER), 31)
+                status.text = "Choose ${getString(R.string.app_name)} as the browser to check normal web links against family rules."
+            } else status.text = "This app is already the default browser, or this Android device does not offer browser-role selection."
+        } else {
+            startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+            status.text = "Choose ${getString(R.string.app_name)} as the browser in Android Settings."
+        }
+    }
+
     private fun styleControls(root: LinearLayout) {
         for (index in 0 until root.childCount) {
             when (val child = root.getChildAt(index)) {
@@ -165,7 +194,7 @@ class ChildModeActivity : android.app.Activity() {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
                         text.toString().startsWith("SOS") -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(190, 45, 65)) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
+                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(Color.rgb(19, 102, 214)); background = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.rgb(171, 204, 244)) } }
                         else -> { setTextColor(Color.WHITE); backgroundTintList = ColorStateList.valueOf(Color.rgb(19, 102, 214)) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }
