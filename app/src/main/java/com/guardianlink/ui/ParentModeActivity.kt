@@ -261,7 +261,12 @@ class ParentModeActivity : android.app.Activity() {
             val profile = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(8)); background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); layoutParams = layoutParams(10, 8) }
             profile.addView(NoirUi.avatar(this, device.displayName).apply { layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)) })
             profile.addView(TextView(this).apply { text = "${device.displayName}\nActive child profile"; textSize = 15f; setTextColor(NoirUi.TEXT); setPadding(dp(12), 0, 0, 0) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            profile.addView(secondaryButton("Switch") { content.removeAllViews(); buildDashboard(devices) }.apply { minHeight = dp(42); layoutParams = LinearLayout.LayoutParams(dp(86), dp(42)) })
+            profile.addView(secondaryButton("Choose") {
+                selectedDevice = null
+                selectedVersion = 0
+                selectedPolicy = ChildPolicy()
+                buildDashboard(devices)
+            }.apply { minHeight = dp(42); layoutParams = LinearLayout.LayoutParams(dp(86), dp(42)) })
             content.addView(profile)
             content.addView(section("Today’s screen time"))
             val dial = ScreenTimeDialView(this)
@@ -270,7 +275,7 @@ class ParentModeActivity : android.app.Activity() {
             content.addView(health); loadDeviceHealth(device, health, dial)
             content.addView(controlRow(
                 "Instant\nLock" to { sendCommand("pause", null, "all_child_apps") },
-                "Geofence\nActive" to { switchSection(DashboardSection.SAFETY, devices) },
+                "Safe\nplaces" to { switchSection(DashboardSection.SAFETY, devices) },
                 "Bedtime\nMode" to { switchSection(DashboardSection.CONTROLS, devices) }
             ))
             val latest = note("Loading latest shared position…")
@@ -280,15 +285,21 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun buildFamilyCenter(devices: List<DeviceRecord>) {
-        content.addView(section("Family setup & alerts"))
-        content.addView(note("Pair a child once, keep parent alerts enabled, and use this area for account-level actions."))
-        content.addView(actionRow("Pair a child" to { showPairingDialog() }, "Parent alerts" to { showAlertControls() }))
+        content.addView(section("Family, alerts & support"))
+        content.addView(note("Manage family-wide communication, alerts, and help here. Pair a child from the Overview screen."))
+        content.addView(secondaryButton("Parent alerts") { showAlertControls() })
         selectedDevice?.let { device ->
-            content.addView(secondaryButton("Family chat with ${device.displayName}") { family?.let { startActivity(FamilyChatActivity.parentIntent(this, it.id, device.id, device.displayName)) } })
+            content.addView(section("Family communication"))
+            content.addView(actionRow(
+                "Quick updates" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } },
+                "Family chat" to { family?.let { startActivity(FamilyChatActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
+            ))
         }
-        content.addView(secondaryButton("Ask Guardian Guide") { startActivity(GuardianGuideActivity.intent(this, true)) })
-        content.addView(secondaryButton("How to use this dashboard") { startActivity(HowToUseActivity.parentIntent(this)) })
-        content.addView(secondaryButton("Refresh family status") { refreshFamily() })
+        content.addView(section("Help & guide"))
+        content.addView(actionRow(
+            "Guardian Guide" to { startActivity(GuardianGuideActivity.intent(this, true)) },
+            "Dashboard manual" to { startActivity(HowToUseActivity.parentIntent(this)) }
+        ))
         content.addView(secondaryButton("Sign out") { signOut() })
     }
 
@@ -310,7 +321,7 @@ class ParentModeActivity : android.app.Activity() {
         val location = CheckBox(this).apply { text = "Enable visible child location sharing"; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.locationEnabled }
         val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
         content.addView(location); content.addView(interval)
-        content.addView(button("Save location sharing") {
+        content.addView(button("Save parent location consent") {
             publishPolicy(selectedPolicy.copy(locationEnabled = location.isChecked, locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15))
         })
         content.addView(actionRow(
@@ -335,10 +346,7 @@ class ParentModeActivity : android.app.Activity() {
             else publishPolicy(selectedPolicy.copy(safePlaces = selectedPolicy.safePlaces.filterNot { it.name.equals(place.name, true) } + place))
         })
         content.addView(secondaryButton("Clear all safe places") { publishPolicy(selectedPolicy.copy(safePlaces = emptyList())) })
-        content.addView(actionRow(
-            "Quick messages" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } },
-            "Safety activity" to { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) }
-        ))
+        content.addView(secondaryButton("Safety activity") { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) })
     }
 
     private fun buildDeviceControls(device: DeviceRecord) {
@@ -349,7 +357,7 @@ class ParentModeActivity : android.app.Activity() {
             "Pause all" to { sendCommand("pause", null, "all_child_apps") }
         ))
         content.addView(actionRow(
-            "Pause 30 min" to { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) },
+            "Pause managed 30 min" to { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) },
             "Resume access" to { sendCommand("resume", null) }
         ))
         content.addView(actionRow(
@@ -494,19 +502,6 @@ class ParentModeActivity : android.app.Activity() {
             runOnUiThread {
                 if (ok) { selectedVersion += 1; selectedPolicy = policy.copy(version = selectedVersion); setStatus("Rules sent to ${device.displayName}.") }
                 else setStatus("Could not publish rules. Try refreshing the device and try again.")
-            }
-        }.start()
-    }
-
-    private fun loadLocation() {
-        val current = session ?: return
-        val device = selectedDevice ?: return
-        setStatus("Loading latest location…")
-        Thread {
-            val location = ParentApi(usableParentSession(current)).latestLocation(device.id)
-            runOnUiThread {
-                setStatus(location?.let { "Latest location: ${it.latitude}, ${it.longitude}\nAccuracy: ${it.accuracyMeters?.let { meters -> "${meters.toInt()} m" } ?: "unknown"}\nRecorded: ${it.recordedAt}" }
-                    ?: "No shared location yet. Enable location sharing and grant location permission on the child phone.")
             }
         }.start()
     }

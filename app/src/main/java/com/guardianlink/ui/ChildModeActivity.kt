@@ -36,7 +36,6 @@ class ChildModeActivity : android.app.Activity() {
         root.addView(TextView(this).apply { text = "CHILD DEVICE SETUP"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
         root.addView(TextView(this).apply { text = "Set up protection together"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(5), 0, dp(4)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
         root.addView(TextView(this).apply { text = "Pair this phone first. Android permissions are requested only in the final activation step."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(12)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-        root.addView(Button(this).apply { text = "How to use this child device"; setOnClickListener { startActivity(HowToUseActivity.childIntent(this@ChildModeActivity)) } })
 
         root.addView(stepHeader("1", "Pair this child phone", "Paste the single-use code shown in the parent dashboard."))
         val pairingCode = EditText(this).apply { hint = "Paste one-time pairing code"; setSingleLine() }
@@ -72,6 +71,7 @@ class ChildModeActivity : android.app.Activity() {
                 }.start()
             }
         }
+        if (DeviceSessionStore(this).isPaired()) pairButton.text = "Paired — sync rules"
         root.addView(pairButton)
 
         root.addView(stepHeader("2", "Recommended protection settings", "No permissions are requested in this step. The parent chooses rules from their dashboard."))
@@ -89,7 +89,7 @@ class ChildModeActivity : android.app.Activity() {
             setOnClickListener { completeStepFive() }
         })
         root.addView(Button(this).apply {
-            text = "Start visible location sharing"
+            text = "Start location sharing (requires parent consent)"
             setOnClickListener { startLocationSharingAfterSetup() }
         })
         root.addView(Button(this).apply {
@@ -104,11 +104,14 @@ class ChildModeActivity : android.app.Activity() {
             text = "SOS — alert parent"
             setOnClickListener { sendSos() }
         })
-        root.addView(Button(this).apply { text = "Quick messages with parent"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
-        root.addView(Button(this).apply { text = "Family chat & voice notes"; setOnClickListener { startActivity(FamilyChatActivity.childIntent(this@ChildModeActivity)) } })
-        root.addView(Button(this).apply { text = "Ask Guardian Guide"; setOnClickListener { startActivity(GuardianGuideActivity.intent(this@ChildModeActivity, false)) } })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Use this as default browser"; setOnClickListener { requestDefaultBrowser() } })
+        root.addView(sectionHeader("Family communication", "Send a fast preset update or use private text and voice notes with your parent."))
+        root.addView(Button(this).apply { text = "Quick updates (presets)"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
+        root.addView(Button(this).apply { text = "Family chat & voice notes"; setOnClickListener { startActivity(FamilyChatActivity.childIntent(this@ChildModeActivity)) } })
+        root.addView(sectionHeader("Help & guide", "Use the guide for questions or the manual for a step-by-step explanation."))
+        root.addView(Button(this).apply { text = "Ask Guardian Guide"; setOnClickListener { startActivity(GuardianGuideActivity.intent(this@ChildModeActivity, false)) } })
+        root.addView(Button(this).apply { text = "How to use this child device"; setOnClickListener { startActivity(HowToUseActivity.childIntent(this@ChildModeActivity)) } })
         status = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() } }
         root.addView(status)
         styleControls(root)
@@ -196,7 +199,7 @@ class ChildModeActivity : android.app.Activity() {
                     isAllCaps = false; textSize = 15f; minHeight = dp(48)
                     when {
                         text.toString().startsWith("SOS") -> { setTextColor(NoirUi.TEXT); backgroundTintList = ColorStateList.valueOf(NoirUi.DANGER) }
-                        text.toString().startsWith("Start visible") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick messages") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(NoirUi.TEXT); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) } }
+                        text.toString().startsWith("Start location") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick updates") || text.toString().startsWith("Family chat") || text.toString().startsWith("Ask Guardian") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(NoirUi.TEXT); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) } }
                         else -> { setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD) }
                     }
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }
@@ -214,6 +217,12 @@ class ChildModeActivity : android.app.Activity() {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(10), 0, dp(4)) }
         addView(TextView(this@ChildModeActivity).apply { text = number; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(NoirUi.BACKGROUND); background = GradientDrawable().apply { setColor(NoirUi.GOLD); shape = GradientDrawable.OVAL }; layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
         addView(LinearLayout(this@ChildModeActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) }); addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+    }
+
+    private fun sectionHeader(title: String, body: String) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL; setPadding(dp(4), dp(16), dp(4), dp(4))
+        addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) })
+        addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) })
     }
 
     private fun infoCard(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() }; layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(2), 0, 0) } }

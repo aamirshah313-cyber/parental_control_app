@@ -1,6 +1,5 @@
 package com.guardianlink.ui
 
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.text.InputType
@@ -85,7 +84,7 @@ class ManageAppsActivity : android.app.Activity() {
             "Allow selected" to { updatePolicy { it.copy(blockedPackages = it.blockedPackages - chosen(), approvedPackages = it.approvedPackages + chosen()) } }
         ))
         content.addView(actionRow(
-            "Add to pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } },
+            "Include in pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages + chosen()) } },
             "Remove from pause" to { updatePolicy { it.copy(managedPackages = it.managedPackages - chosen()) } }
         ))
         content.addView(TextView(this).apply { text = "Daily limits"; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT); setPadding(0, dp(18), 0, dp(4)) })
@@ -123,7 +122,6 @@ class ManageAppsActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun primaryButton(label: String, action: () -> Unit) = Button(this).apply { text = label; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); minHeight = dp(48); setOnClickListener { action() } }
     private fun actionRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
