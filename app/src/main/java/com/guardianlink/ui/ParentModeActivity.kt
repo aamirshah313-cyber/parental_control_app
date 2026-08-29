@@ -51,6 +51,7 @@ class ParentModeActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         session = sessionStore.load()
         buildScreen()
         if (session != null) refreshFamily()
@@ -301,6 +302,10 @@ class ParentModeActivity : android.app.Activity() {
             "Guardian Guide" to { startActivity(GuardianGuideActivity.intent(this, true)) },
             "Dashboard manual" to { startActivity(HowToUseActivity.parentIntent(this)) }
         ))
+        content.addView(secondaryButton(if (NoirUi.isDark(this)) "Appearance: Dark mode" else "Appearance: Light mode") {
+            NoirUi.toggle(this)
+            recreate()
+        })
         content.addView(secondaryButton("Sign out") { signOut() })
     }
 

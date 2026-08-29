@@ -16,6 +16,7 @@ class GuardianGuideActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(28)); setBackgroundColor(NoirUi.BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(root) })
         root.addView(NoirUi.eyebrow(this, "ON-DEVICE GUIDE"))

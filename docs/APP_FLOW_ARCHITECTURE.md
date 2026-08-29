@@ -27,13 +27,13 @@ Detail pages are children of the parent dashboard: Manage Apps, Time Requests, L
 
 ```
 Child hub
-├── Pairing / setup / sync
-├── Protection, apps, time request, SOS
-├── Location and supervised browser
-└── Communication: quick messages, family chat, Guardian Guide
+├── Home: pairing, rule sync, visible Android protection, installed-app report
+├── Safety: SOS, Family Browser/default-browser setup, visible location
+├── Connect: latest quick update, Family Chat and voice notes, time request
+└── Help: Guardian Guide, child manual, light/dark appearance toggle
 ```
 
-The child hub stays in the task while a detailed screen opens. Back returns to the hub. The supervised browser’s back affordance first walks browser history; at the initial page it closes the browser and returns to the child hub.
+Quick Updates intentionally shows only the newest preset update; Family Chat is the separate place for an ongoing text or voice-note history. The selected light/dark appearance is saved locally and used by the shared parent/child visual system. The child hub stays in the task while a detailed screen opens. Back returns to the hub; when a child tab is open, Back returns to Home. The supervised browser’s back affordance first walks browser history; at the initial page it closes the browser and returns to the child hub.
 
 ## Back-stack rules
 

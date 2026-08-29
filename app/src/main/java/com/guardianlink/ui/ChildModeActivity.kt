@@ -1,182 +1,204 @@
 package com.guardianlink.ui
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
-import android.app.role.RoleManager
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.view.Gravity
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
+import com.guardianlink.R
+import com.guardianlink.enforcement.AppInventoryReporter
 import com.guardianlink.enforcement.LocationService
 import com.guardianlink.enforcement.ProtectionService
-import com.guardianlink.enforcement.AppInventoryReporter
 import com.guardianlink.sync.DeviceSessionStore
 import com.guardianlink.sync.PairingClient
 import com.guardianlink.sync.PolicySynchronizer
-import com.guardianlink.R
 
-/** Five-step child onboarding. Runtime Android permissions are deliberately deferred to step 5. */
+/** Child hub: setup remains available, while daily actions are grouped into clear destinations. */
 class ChildModeActivity : android.app.Activity() {
+    private lateinit var content: LinearLayout
     private lateinit var status: TextView
     private val setupPrefs by lazy { getSharedPreferences("guardian_child_setup", MODE_PRIVATE) }
     private var pairingInProgress = false
+    private var lastStatus = "Choose an area below. Parent rules stay active after their last successful sync."
+    private var section = ChildSection.HOME
+
+    private enum class ChildSection { HOME, SAFETY, CONNECT, HELP }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_HORIZONTAL; setPadding(dp(20), dp(24), dp(20), dp(28)); setBackgroundColor(NoirUi.BACKGROUND) }
-        root.addView(TextView(this).apply { text = "CHILD DEVICE SETUP"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-        root.addView(TextView(this).apply { text = "Set up protection together"; textSize = 27f; typeface = Typeface.create("serif", Typeface.NORMAL); setTextColor(NoirUi.TEXT); setPadding(0, dp(5), 0, dp(4)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-        root.addView(TextView(this).apply { text = "Pair this phone first. Android permissions are requested only in the final activation step."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(12)); layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT) })
-
-        root.addView(stepHeader("1", "Pair this child phone", "Paste the single-use code shown in the parent dashboard."))
-        val pairingCode = EditText(this).apply { hint = "Paste one-time pairing code"; setSingleLine() }
-        root.addView(pairingCode)
-        val pairButton = Button(this).apply {
-            text = "Pair this device"
-            setOnClickListener {
-                val existingSession = DeviceSessionStore(this@ChildModeActivity)
-                if (existingSession.isPaired()) {
-                    status.text = "This child device is already paired. Syncing rules…"
-                    Thread { PolicySynchronizer(this@ChildModeActivity).sync() }.start()
-                    return@setOnClickListener
-                }
-                if (pairingInProgress) return@setOnClickListener
-                pairingInProgress = true
-                isEnabled = false
-                status.text = "Pairing…"
-                Thread {
-                    val result = PairingClient().claim(pairingCode.text.toString(), android.os.Build.MODEL)
-                    runOnUiThread {
-                        pairingInProgress = false
-                        if (result == null) {
-                            isEnabled = true
-                            status.text = "Pairing failed. The code may be expired, already used, or the internet connection is unavailable."
-                        }
-                        else {
-                            DeviceSessionStore(this@ChildModeActivity).save(result.deviceId, result.accessToken, result.refreshToken)
-                            text = "This device is paired"
-                            status.text = "Paired. Continue with the recommended setup steps below."
-                            Thread { PolicySynchronizer(this@ChildModeActivity).sync() }.start()
-                        }
-                    }
-                }.start()
-            }
+        NoirUi.apply(this)
+        content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(28))
+            setBackgroundColor(NoirUi.BACKGROUND)
         }
-        if (DeviceSessionStore(this).isPaired()) pairButton.text = "Paired — sync rules"
-        root.addView(pairButton)
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
+        buildHub()
+    }
 
-        root.addView(stepHeader("2", "Recommended protection settings", "No permissions are requested in this step. The parent chooses rules from their dashboard."))
-        root.addView(infoCard("Supervised browser can block YouTube Shorts and selected keywords. Bedtime, app approval, and location sharing are controlled by the parent."))
-        root.addView(stepHeader("3", "Download parent rules", "Sync after pairing and whenever the parent changes rules."))
-        root.addView(Button(this).apply {
-            text = "Sync rules now"
-            setOnClickListener { Thread { val ok = PolicySynchronizer(this@ChildModeActivity).sync(); runOnUiThread { status.text = if (ok) "Rules synced." else "Could not sync rules." } }.start() }
-        })
-        root.addView(stepHeader("4", "Optional location sharing", "Location stays off until the parent enables it. It is always visible through an Android notification."))
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() {
+        if (section == ChildSection.HOME) finish() else {
+            section = ChildSection.HOME
+            buildHub()
+        }
+    }
 
-        root.addView(stepHeader("5", "Activate Android protection", "This is the only step that opens Android permission and Usage Access settings."))
-        root.addView(Button(this).apply {
-            text = "Complete step 5: enable protection"
-            setOnClickListener { completeStepFive() }
+    private fun buildHub() {
+        content.removeAllViews()
+        val paired = DeviceSessionStore(this).isPaired()
+        content.addView(NoirUi.eyebrow(this, "CHILD SPACE"))
+        content.addView(NoirUi.title(this, if (paired) "This device" else "Set up this device").apply { setPadding(0, dp(5), 0, dp(4)) })
+        content.addView(TextView(this).apply {
+            text = if (paired) "Your parent manages safety rules. You can sync, ask for help, and use family tools here." else "Pair this phone with a parent before activating protection or sending family updates."
+            textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(10))
         })
-        root.addView(Button(this).apply {
-            text = "Start location sharing (requires parent consent)"
-            setOnClickListener { startLocationSharingAfterSetup() }
-        })
-        root.addView(Button(this).apply {
-            text = "Refresh installed apps for parent"
-            setOnClickListener { refreshInstalledApps() }
-        })
-        root.addView(Button(this).apply {
-            text = "Ask parent for extra screen time"
-            setOnClickListener { requestMoreTime() }
-        })
-        root.addView(Button(this).apply {
-            text = "SOS — alert parent"
-            setOnClickListener { sendSos() }
-        })
-        root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
-        root.addView(Button(this).apply { text = "Use this as default browser"; setOnClickListener { requestDefaultBrowser() } })
-        root.addView(sectionHeader("Family communication", "Send a fast preset update or use private text and voice notes with your parent."))
-        root.addView(Button(this).apply { text = "Quick updates (presets)"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
-        root.addView(Button(this).apply { text = "Family chat & voice notes"; setOnClickListener { startActivity(FamilyChatActivity.childIntent(this@ChildModeActivity)) } })
-        root.addView(sectionHeader("Help & guide", "Use the guide for questions or the manual for a step-by-step explanation."))
-        root.addView(Button(this).apply { text = "Ask Guardian Guide"; setOnClickListener { startActivity(GuardianGuideActivity.intent(this@ChildModeActivity, false)) } })
-        root.addView(Button(this).apply { text = "How to use this child device"; setOnClickListener { startActivity(HowToUseActivity.childIntent(this@ChildModeActivity)) } })
-        status = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() } }
-        root.addView(status)
-        styleControls(root)
-        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(root) })
+        content.addView(statusCard(if (paired) "Paired child device • rules are checked locally" else "Not paired yet • start from Home"))
+        content.addView(navigationRow(ChildSection.HOME, ChildSection.SAFETY))
+        content.addView(navigationRow(ChildSection.CONNECT, ChildSection.HELP))
+        when (section) {
+            ChildSection.HOME -> buildHome(paired)
+            ChildSection.SAFETY -> buildSafety(paired)
+            ChildSection.CONNECT -> buildConnect(paired)
+            ChildSection.HELP -> buildHelp()
+        }
+        status = statusCard(lastStatus)
+        content.addView(status)
+    }
+
+    private fun buildHome(paired: Boolean) {
+        content.addView(sectionTitle("Setup & device"))
+        if (!paired) {
+            content.addView(note("Enter the single-use code shown by the parent. If this phone was already paired, use Sync rules instead of pairing again."))
+            val pairingCode = EditText(this).apply {
+                hint = "Paste one-time pairing code"; setSingleLine(); setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED)
+                background = NoirUi.rounded(this@ChildModeActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 14); setPadding(dp(14), dp(4), dp(14), dp(4))
+            }
+            content.addView(pairingCode, margins(6))
+            content.addView(NoirUi.primaryButton(this, "Pair this device") { pair(pairingCode.text.toString()) }.apply { layoutParams = margins(6) })
+            content.addView(note("After pairing, return here to sync rules and complete the clearly explained Android protection step."))
+            return
+        }
+
+        content.addView(actionRow("Sync rules" to { syncRules() }, "Activate protection" to { completeStepFive() }))
+        content.addView(note("Activation opens Android’s visible notification and Usage Access settings. It never enables hidden monitoring."))
+        content.addView(sectionTitle("Keep your parent informed"))
+        content.addView(actionRow("Refresh installed apps" to { refreshInstalledApps() }, "Request extra time" to { requestMoreTime() }))
+    }
+
+    private fun buildSafety(paired: Boolean) {
+        content.addView(sectionTitle("Safety tools"))
+        if (!paired) content.addView(note("Pair this device first to download family rules. The supervised browser can still be opened, but no parent policy is available until pairing succeeds."))
+        content.addView(primaryDanger("SOS — alert parent") { sendSos() }.apply { layoutParams = margins(6) })
+        content.addView(note("Use SOS only for a real urgent situation. It sends a visible alarm to the paired parent when both phones have internet access."))
+        content.addView(sectionTitle("Family Browser"))
+        content.addView(actionRow("Open Family Browser" to { startActivity(SafeBrowserActivity.intent(this)) }, "Make it default" to { requestDefaultBrowser() }))
+        content.addView(note("Category filters, websites, YouTube Shorts, and custom keywords are checked only in Family Browser. Your parent controls these rules."))
+        content.addView(sectionTitle("Visible location"))
+        content.addView(NoirUi.secondaryButton(this, "Start location sharing") { startLocationSharingAfterSetup() }.apply { layoutParams = margins(6) })
+        content.addView(note("Location requires parent consent, your Android permission, and an always-visible Android notification."))
+    }
+
+    private fun buildConnect(paired: Boolean) {
+        content.addView(sectionTitle("Family connection"))
+        if (!paired) content.addView(note("Pair this device before sending updates or messages to a parent."))
+        content.addView(actionRow("Quick updates" to { startActivity(QuickMessagesActivity.childIntent(this)) }, "Family chat" to { startActivity(FamilyChatActivity.childIntent(this)) }))
+        content.addView(note("Quick updates show only the latest preset message. Use Family Chat for a full typed or voice-note conversation."))
+        content.addView(NoirUi.secondaryButton(this, "Ask parent for extra time") { requestMoreTime() }.apply { layoutParams = margins(6) })
+    }
+
+    private fun buildHelp() {
+        content.addView(sectionTitle("Help & appearance"))
+        val darkMode = Switch(this).apply {
+            text = "Dark appearance"; textSize = 15f; setTextColor(NoirUi.TEXT); isChecked = NoirUi.isDark(this@ChildModeActivity)
+            setOnCheckedChangeListener { _, checked -> AppTheme.setDark(this@ChildModeActivity, checked); NoirUi.apply(this@ChildModeActivity); recreate() }
+        }
+        content.addView(darkMode, margins(4))
+        content.addView(note("Appearance is saved for the whole app. Switch off Dark appearance for light mode."))
+        content.addView(actionRow("Guardian Guide" to { startActivity(GuardianGuideActivity.intent(this, false)) }, "How to use" to { startActivity(HowToUseActivity.childIntent(this)) }))
+        content.addView(note("The Guardian Guide is an on-device help tool. It does not send your questions to a cloud AI service."))
+    }
+
+    private fun pair(code: String) {
+        val existingSession = DeviceSessionStore(this)
+        if (existingSession.isPaired()) { showStatus("This device is already paired. Syncing rules…"); syncRules(); return }
+        if (code.isBlank()) { showStatus("Paste the pairing code from the parent app first."); return }
+        if (pairingInProgress) return
+        pairingInProgress = true; showStatus("Pairing this device…")
+        Thread {
+            val result = PairingClient().claim(code, android.os.Build.MODEL)
+            runOnUiThread {
+                pairingInProgress = false
+                if (result == null) showStatus("Pairing failed. The code may be expired, already used, or the connection is unavailable.")
+                else {
+                    DeviceSessionStore(this).save(result.deviceId, result.accessToken, result.refreshToken)
+                    lastStatus = "Paired successfully. Sync rules, then activate Android protection with your parent."
+                    Thread { PolicySynchronizer(this).sync() }.start()
+                    buildHub()
+                }
+            }
+        }.start()
+    }
+
+    private fun syncRules() {
+        if (!DeviceSessionStore(this).isPaired()) { showStatus("Pair this phone before syncing family rules."); return }
+        showStatus("Syncing family rules…")
+        Thread { val ok = PolicySynchronizer(this).sync(); runOnUiThread { showStatus(if (ok) "Rules synced successfully." else "Could not sync rules. Your last downloaded rules remain active.") } }.start()
     }
 
     private fun completeStepFive() {
-        if (!DeviceSessionStore(this).isPaired()) { status.text = "Complete step 1 before activating protection."; return }
+        if (!DeviceSessionStore(this).isPaired()) { showStatus("Pair this phone before activating protection."); return }
         setupPrefs.edit().putBoolean("permissions_unlocked", true).apply()
-        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
-        }
-        // Usage Access is an Android Settings consent screen, not a hidden permission request.
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 9)
         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         Thread { PolicySynchronizer(this).sync() }.start()
         startForegroundService(Intent(this, ProtectionService::class.java))
-        status.text = "Enable Usage Access for ${getString(R.string.app_name)}, then return here. Protection is starting."
+        showStatus("Enable Usage Access for ${getString(R.string.app_name)}, then return here. Protection is starting.")
     }
 
     private fun startLocationSharingAfterSetup() {
-        if (!setupPrefs.getBoolean("permissions_unlocked", false)) { status.text = "Complete step 5 before enabling optional location sharing."; return }
+        if (!DeviceSessionStore(this).isPaired()) { showStatus("Pair this device before starting visible location sharing."); return }
+        if (!setupPrefs.getBoolean("permissions_unlocked", false)) { showStatus("Activate protection from Home before enabling optional location sharing."); return }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 15)
-            status.text = "Allow location only if the parent has enabled location sharing."
+            showStatus("Allow location only if your parent has enabled visible location sharing.")
             return
         }
         startForegroundService(Intent(this, LocationService::class.java))
-        status.text = "Visible location sharing started if the parent policy permits it."
+        showStatus("Visible location sharing started if the parent policy permits it.")
     }
 
     private fun sendSos() {
         val session = DeviceSessionStore(this)
-        if (!session.isPaired()) { status.text = "Pair this child phone before sending SOS."; return }
-        status.text = "Sending SOS alert…"
+        if (!session.isPaired()) { showStatus("Pair this child phone before sending SOS."); return }
+        showStatus("Sending SOS alert…")
         Thread {
-            val sent = session.api()?.postEvent("sos", org.json.JSONObject().apply {
-                put("message", "Child pressed SOS")
-            }) == true
-            runOnUiThread { status.text = if (sent) "SOS sent. The parent alarm should sound within 5 seconds." else "SOS could not be sent. Check the internet connection and Supabase SOS migration." }
+            val sent = session.api()?.postEvent("sos", org.json.JSONObject().apply { put("message", "Child pressed SOS") }) == true
+            runOnUiThread { showStatus(if (sent) "SOS sent. The parent alarm should sound within a few seconds." else "SOS could not be sent. Check the internet connection and Supabase SOS migration.") }
         }.start()
     }
 
     private fun requestMoreTime() {
         val session = DeviceSessionStore(this)
-        if (!session.isPaired()) { status.text = "Pair this child phone before requesting extra time."; return }
+        if (!session.isPaired()) { showStatus("Pair this child phone before requesting extra time."); return }
         val options = intArrayOf(15, 30, 45, 60)
-        android.app.AlertDialog.Builder(this)
-            .setTitle("Ask for extra time")
-            .setMessage("Choose how much additional screen time you need today. Your parent decides whether to grant it.")
+        android.app.AlertDialog.Builder(this).setTitle("Ask for extra time").setMessage("Choose the extra screen time you need today. Your parent decides whether to grant it.")
             .setItems(options.map { "$it minutes" }.toTypedArray()) { _, which ->
-                status.text = "Sending time request…"
-                Thread {
-                    val sent = session.api()?.requestMoreScreenTime(options[which]) == true
-                    runOnUiThread { status.text = if (sent) "Request sent. Check again after your parent responds and this device syncs." else "Could not send request. Check your internet connection and run the professional controls migration." }
-                }.start()
+                showStatus("Sending time request…")
+                Thread { val sent = session.api()?.requestMoreScreenTime(options[which]) == true; runOnUiThread { showStatus(if (sent) "Request sent. Sync after your parent responds." else "Could not send request. Check the connection and the professional-controls migration.") } }.start()
             }.setNegativeButton("Cancel", null).show()
     }
 
     private fun refreshInstalledApps() {
-        if (!DeviceSessionStore(this).isPaired()) { status.text = "Pair this device before sending its app list."; return }
-        status.text = "Refreshing installed apps for parent…"
-        Thread {
-            val sent = AppInventoryReporter(this).reportNow()
-            runOnUiThread { status.text = if (sent) "App list sent. The parent can now open Manage child apps and allow, block, pause, or set a limit." else "Could not send the app list. Check the internet connection, then try again." }
-        }.start()
+        if (!DeviceSessionStore(this).isPaired()) { showStatus("Pair this device before sending its app list."); return }
+        showStatus("Refreshing installed apps for parent…")
+        Thread { val sent = AppInventoryReporter(this).reportNow(); runOnUiThread { showStatus(if (sent) "App list sent. Your parent can manage apps from their dashboard." else "Could not send the app list. Check the connection, then try again.") } }.start()
     }
 
     private fun requestDefaultBrowser() {
@@ -184,48 +206,34 @@ class ChildModeActivity : android.app.Activity() {
             val roles = getSystemService(RoleManager::class.java)
             if (roles.isRoleAvailable(RoleManager.ROLE_BROWSER) && !roles.isRoleHeld(RoleManager.ROLE_BROWSER)) {
                 startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_BROWSER), 31)
-                status.text = "Choose ${getString(R.string.app_name)} as the browser to check normal web links against family rules."
-            } else status.text = "This app is already the default browser, or this Android device does not offer browser-role selection."
+                showStatus("Choose ${getString(R.string.app_name)} as the browser to check normal links against family rules.")
+            } else showStatus("This app is already the default browser, or this phone does not offer browser-role selection.")
         } else {
             startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
-            status.text = "Choose ${getString(R.string.app_name)} as the browser in Android Settings."
+            showStatus("Choose ${getString(R.string.app_name)} as the browser in Android Settings.")
         }
     }
 
-    private fun styleControls(root: LinearLayout) {
-        for (index in 0 until root.childCount) {
-            when (val child = root.getChildAt(index)) {
-                is Button -> child.apply {
-                    isAllCaps = false; textSize = 15f; minHeight = dp(48)
-                    when {
-                        text.toString().startsWith("SOS") -> { setTextColor(NoirUi.TEXT); backgroundTintList = ColorStateList.valueOf(NoirUi.DANGER) }
-                        text.toString().startsWith("Start location") || text.toString().startsWith("Open supervised") || text.toString().startsWith("Use this as") || text.toString().startsWith("Refresh installed") || text.toString().startsWith("Quick updates") || text.toString().startsWith("Family chat") || text.toString().startsWith("Ask Guardian") || text.toString().startsWith("Ask parent") || text.toString().startsWith("How to use") || text.toString().startsWith("Sync") -> { setTextColor(NoirUi.TEXT); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) } }
-                        else -> { setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD) }
-                    }
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(8)) }
-                }
-                is EditText -> child.apply {
-                    setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); setPadding(dp(14), dp(4), dp(14), dp(4)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, dp(10)) }
-                }
-            }
+    private fun showStatus(message: String) { lastStatus = message; if (::status.isInitialized) status.text = message }
+
+    private fun navigationRow(first: ChildSection, second: ChildSection) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL; layoutParams = margins(4)
+        listOf(first, second).forEachIndexed { index, target ->
+            addView(NoirUi.secondaryButton(this@ChildModeActivity, if (section == target) "• ${label(target)}" else label(target)) { section = target; buildHub() }.apply { isSelected = section == target }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(if (index == 0) 0 else dp(4), 0, if (index == 0) dp(4) else 0, 0) })
         }
     }
 
-    private fun stepHeader(number: String, title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP; setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE); cornerRadius = dp(16).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(10), 0, dp(4)) }
-        addView(TextView(this@ChildModeActivity).apply { text = number; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(NoirUi.BACKGROUND); background = GradientDrawable().apply { setColor(NoirUi.GOLD); shape = GradientDrawable.OVAL }; layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
-        addView(LinearLayout(this@ChildModeActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) }); addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+    private fun actionRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL; layoutParams = margins(4)
+        addView(NoirUi.secondaryButton(this@ChildModeActivity, first.first, first.second), LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(0, 0, dp(4), 0) })
+        addView(NoirUi.secondaryButton(this@ChildModeActivity, second.first, second.second), LinearLayout.LayoutParams(0, dp(52), 1f).apply { setMargins(dp(4), 0, 0, 0) })
     }
 
-    private fun sectionHeader(title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; setPadding(dp(4), dp(16), dp(4), dp(4))
-        addView(TextView(this@ChildModeActivity).apply { text = title; textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) })
-        addView(TextView(this@ChildModeActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) })
-    }
-
-    private fun infoCard(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() }; layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(2), 0, 0) } }
-
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun primaryDanger(text: String, action: () -> Unit) = NoirUi.primaryButton(this, text, action).apply { setTextColor(NoirUi.TEXT); background = NoirUi.interactiveBackground(this@ChildModeActivity, NoirUi.DANGER, NoirUi.DANGER, NoirUi.DANGER, 16) }
+    private fun statusCard(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(NoirUi.GOLD); setPadding(dp(14), dp(11), dp(14), dp(11)); background = NoirUi.rounded(this@ChildModeActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 14); layoutParams = margins(6) }
+    private fun note(text: String) = TextView(this).apply { this.text = text; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(11), dp(14), dp(11)); background = NoirUi.rounded(this@ChildModeActivity, NoirUi.SURFACE, NoirUi.SURFACE_RAISED, 14); layoutParams = margins(5) }
+    private fun sectionTitle(text: String) = TextView(this).apply { this.text = text; textSize = 17f; setTextColor(NoirUi.TEXT); typeface = android.graphics.Typeface.DEFAULT_BOLD; setPadding(0, dp(14), 0, dp(4)) }
+    private fun label(target: ChildSection) = target.name.lowercase().replaceFirstChar { it.uppercase() }
+    private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
+    private fun dp(value: Int) = NoirUi.dp(this, value)
 }

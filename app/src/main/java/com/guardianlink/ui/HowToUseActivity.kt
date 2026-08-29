@@ -15,13 +15,14 @@ class HowToUseActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(28)); setBackgroundColor(BACKGROUND) }
-        setContentView(ScrollView(this).apply { setBackgroundColor(BACKGROUND); addView(content) })
-        content.addView(TextView(this).apply { text = "HOW TO USE"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(BLUE) })
-        content.addView(TextView(this).apply { text = if (isParent) "Parent guide" else "Child device guide"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(5), 0, dp(5)) })
-        content.addView(TextView(this).apply { text = if (isParent) "A short guide to the tools in your family dashboard." else "A clear guide to what is enabled on this child device."; textSize = 14f; setTextColor(MUTED); setPadding(0, 0, 0, dp(10)) })
+        NoirUi.apply(this)
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(28)); setBackgroundColor(NoirUi.BACKGROUND) }
+        setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
+        content.addView(NoirUi.eyebrow(this, "How to use"))
+        content.addView(NoirUi.title(this, if (isParent) "Parent guide" else "Child device guide").apply { setPadding(0, dp(5), 0, dp(5)) })
+        content.addView(TextView(this).apply { text = if (isParent) "A short guide to the tools in your family dashboard." else "A clear guide to what is enabled on this child device."; textSize = 14f; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(10)) })
         if (isParent) parentGuide(content) else childGuide(content)
-        content.addView(Button(this).apply { text = "Back"; isAllCaps = false; setTextColor(BLUE); background = outlined(); layoutParams = margins(16); setOnClickListener { finish() } })
+        content.addView(NoirUi.secondaryButton(this, "Back") { finish() }.apply { layoutParams = margins(16) })
     }
 
     private fun parentGuide(content: LinearLayout) {
@@ -42,23 +43,17 @@ class HowToUseActivity : android.app.Activity() {
     }
 
     private fun guideCard(number: String, title: String, body: String) = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; setPadding(dp(14), dp(13), dp(14), dp(13)); background = rounded(0xFF23242C.toInt(), BORDER); layoutParams = margins(7)
-        addView(TextView(this@HowToUseActivity).apply { text = number; textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setTextColor(BACKGROUND); background = rounded(BLUE, BLUE); layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
-        addView(LinearLayout(this@HowToUseActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@HowToUseActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY) }); addView(TextView(this@HowToUseActivity).apply { text = body; textSize = 13f; setTextColor(MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        orientation = LinearLayout.HORIZONTAL; setPadding(dp(14), dp(13), dp(14), dp(13)); background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); layoutParams = margins(7)
+        addView(TextView(this@HowToUseActivity).apply { text = number; textSize = 14f; typeface = Typeface.DEFAULT_BOLD; gravity = android.view.Gravity.CENTER; setTextColor(NoirUi.BACKGROUND); background = rounded(NoirUi.GOLD, NoirUi.GOLD); layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)) })
+        addView(LinearLayout(this@HowToUseActivity).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), 0, 0, 0); addView(TextView(this@HowToUseActivity).apply { text = title; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.TEXT) }); addView(TextView(this@HowToUseActivity).apply { text = body; textSize = 13f; setTextColor(NoirUi.MUTED); setPadding(0, dp(3), 0, 0) }) }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
     }
 
-    private fun outlined() = GradientDrawable().apply { setColor(0xFF23242C.toInt()); cornerRadius = dp(14).toFloat(); setStroke(dp(1), BORDER) }
     private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat(); setStroke(dp(1), stroke) }
     private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {
         private const val EXTRA_PARENT = "parent_mode"
-        private const val BACKGROUND = 0xFF17181E.toInt()
-        private const val NAVY = 0xFFF5F2EA.toInt()
-        private const val MUTED = 0xFFAFAFBA.toInt()
-        private const val BLUE = 0xFFD8B65B.toInt()
-        private const val BORDER = 0xFF2B2D36.toInt()
         fun parentIntent(context: android.content.Context) = android.content.Intent(context, HowToUseActivity::class.java).putExtra(EXTRA_PARENT, true)
         fun childIntent(context: android.content.Context) = android.content.Intent(context, HowToUseActivity::class.java)
     }

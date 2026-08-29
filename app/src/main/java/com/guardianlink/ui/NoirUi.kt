@@ -9,16 +9,27 @@ import android.view.Gravity
 import android.widget.Button
 import android.widget.TextView
 
-/** Shared graphite-and-gold visual language derived from the approved dashboard reference. */
+/** Shared adaptive graphite/gold visual language for parent and child experiences. */
 object NoirUi {
-    const val BACKGROUND = 0xFF17181E.toInt()
-    const val SURFACE = 0xFF23242C.toInt()
-    const val SURFACE_RAISED = 0xFF2B2D36.toInt()
-    const val GOLD = 0xFFD8B65B.toInt()
-    const val GOLD_DIM = 0xFF7D6A3B.toInt()
-    const val TEXT = 0xFFF5F2EA.toInt()
-    const val MUTED = 0xFFAFAFBA.toInt()
-    const val DANGER = 0xFFC76870.toInt()
+    private var darkMode = true
+
+    val BACKGROUND get() = if (darkMode) 0xFF17181E.toInt() else 0xFFF6F4EE.toInt()
+    val SURFACE get() = if (darkMode) 0xFF23242C.toInt() else 0xFFFFFDFC.toInt()
+    val SURFACE_RAISED get() = if (darkMode) 0xFF2B2D36.toInt() else 0xFFE9E5DA.toInt()
+    val GOLD get() = if (darkMode) 0xFFD8B65B.toInt() else 0xFF8A6715.toInt()
+    val GOLD_DIM get() = if (darkMode) 0xFF7D6A3B.toInt() else 0xFFC5A654.toInt()
+    val TEXT get() = if (darkMode) 0xFFF5F2EA.toInt() else 0xFF202128.toInt()
+    val MUTED get() = if (darkMode) 0xFFAFAFBA.toInt() else 0xFF62646C.toInt()
+    val DANGER get() = if (darkMode) 0xFFC76870.toInt() else 0xFFB53643.toInt()
+
+    fun apply(context: Context) { darkMode = AppTheme.isDark(context) }
+    fun isDark(context: Context): Boolean { apply(context); return darkMode }
+    fun toggle(context: Context): Boolean {
+        val dark = !AppTheme.isDark(context)
+        AppTheme.setDark(context, dark)
+        darkMode = dark
+        return dark
+    }
 
     fun dp(context: Context, value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun rounded(context: Context, fill: Int = SURFACE, stroke: Int = SURFACE_RAISED, radius: Int = 20) = GradientDrawable().apply {

@@ -32,6 +32,7 @@ class SafeBrowserActivity : android.app.Activity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(NoirUi.BACKGROUND) }
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(8), dp(8), dp(8), dp(4)) }
         val back = Button(this).apply { text = "‹"; textSize = 24f; isAllCaps = false; setOnClickListener { navigateBack() } }

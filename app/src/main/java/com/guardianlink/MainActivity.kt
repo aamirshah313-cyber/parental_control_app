@@ -17,6 +17,7 @@ import com.guardianlink.ui.NoirUi
 class MainActivity : android.app.Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(22), dp(30), dp(22), dp(28))
@@ -31,6 +32,12 @@ class MainActivity : android.app.Activity() {
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(NoirUi.GOLD)
             gravity = Gravity.CENTER_HORIZONTAL
+        })
+        content.addView(NoirUi.secondaryButton(this, if (NoirUi.isDark(this)) "Appearance: Dark mode" else "Appearance: Light mode") {
+            NoirUi.toggle(this)
+            recreate()
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 0, 0, dp(10)) }
         })
         content.addView(TextView(this).apply {
             text = "Guidance that keeps family life moving"
