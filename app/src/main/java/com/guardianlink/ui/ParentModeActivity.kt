@@ -21,6 +21,7 @@ import android.widget.TextView
 import com.guardianlink.model.ChildPolicy
 import com.guardianlink.model.ScheduleRule
 import com.guardianlink.model.SafePlace
+import com.guardianlink.model.SafetyCategory
 import com.guardianlink.sync.DeviceRecord
 import com.guardianlink.sync.FamilyRecord
 import com.guardianlink.sync.ParentApi
@@ -306,7 +307,25 @@ class ParentModeActivity : android.app.Activity() {
     private fun buildSafetyCenter(device: DeviceRecord) {
         content.addView(section("${device.displayName} safety"))
         content.addView(note("Browser rules apply in the Family Browser. Make it the default browser on the child phone to have ordinary web links open there."))
-        content.addView(note("Test path: save a rule here, then on the child phone open Family Browser and tap Sync before searching the blocked word."))
+        content.addView(section("Category safety filters"))
+        content.addView(note("Choose the web categories to block. Rules run on the child device using known domains and clear search/page terms; they need no paid API. They do not inspect Chrome, official YouTube, or installed social-media apps—manage those apps separately in Manage child apps. Graphic-violence filtering can also block some news or educational pages."))
+        val adult = safetyCheck(SafetyCategory.ADULT)
+        val violence = safetyCheck(SafetyCategory.VIOLENCE)
+        val gambling = safetyCheck(SafetyCategory.GAMBLING)
+        val socialMedia = safetyCheck(SafetyCategory.SOCIAL_MEDIA)
+        listOf(adult, violence, gambling, socialMedia).forEach(content::addView)
+        content.addView(button("Save category safety filters") {
+            val selectedCategories = buildSet {
+                if (adult.isChecked) add(SafetyCategory.ADULT)
+                if (violence.isChecked) add(SafetyCategory.VIOLENCE)
+                if (gambling.isChecked) add(SafetyCategory.GAMBLING)
+                if (socialMedia.isChecked) add(SafetyCategory.SOCIAL_MEDIA)
+            }
+            publishPolicy(selectedPolicy.copy(blockedSafetyCategories = selectedCategories))
+            setStatus("Category filters sent. On the child phone, open Family Browser and tap Sync to apply them now.")
+        })
+        content.addView(section("Custom browser rules"))
+        content.addView(note("Add your own words or phrases for cases not covered by the category filters."))
         val keywords = field("Blocked words or phrases, separated by commas").apply { setText(selectedPolicy.blockedKeywords.joinToString(", ")) }
         content.addView(keywords)
         content.addView(actionRow(
@@ -347,6 +366,12 @@ class ParentModeActivity : android.app.Activity() {
         })
         content.addView(secondaryButton("Clear all safe places") { publishPolicy(selectedPolicy.copy(safePlaces = emptyList())) })
         content.addView(secondaryButton("Safety activity") { startActivity(ActivityTimelineActivity.intent(this, device.id, device.displayName)) })
+    }
+
+    private fun safetyCheck(category: SafetyCategory) = CheckBox(this).apply {
+        text = "Block ${category.displayName.lowercase()}"
+        setTextColor(NoirUi.TEXT)
+        isChecked = category in selectedPolicy.blockedSafetyCategories
     }
 
     private fun buildDeviceControls(device: DeviceRecord) {

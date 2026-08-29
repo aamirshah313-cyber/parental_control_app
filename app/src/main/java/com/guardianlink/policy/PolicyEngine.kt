@@ -28,6 +28,8 @@ class PolicyEngine {
             val host = runCatching { java.net.URI(url).host ?: "" }.getOrDefault("")
             host.equals(domain, true) || host.endsWith(".$domain", true)
         }?.let { return EnforcementDecision(true, "This website is blocked") }
+        SafetyCategoryRules.decision(policy.blockedSafetyCategories, url, titleOrVisibleText)
+            ?.let { return it }
         if (policy.blockYoutubeShorts && (url.contains("youtube.com/shorts", true) || url.contains("youtu.be/shorts", true))) {
             return EnforcementDecision(true, "YouTube Shorts are blocked")
         }

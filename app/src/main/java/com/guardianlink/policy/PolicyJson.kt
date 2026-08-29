@@ -4,6 +4,7 @@ import com.guardianlink.model.AppLimit
 import com.guardianlink.model.ChildPolicy
 import com.guardianlink.model.ScheduleRule
 import com.guardianlink.model.SafePlace
+import com.guardianlink.model.SafetyCategory
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.DayOfWeek
@@ -20,6 +21,7 @@ object PolicyJson {
         put("blocked_packages", JSONArray(policy.blockedPackages.toList()))
         put("blocked_domains", JSONArray(policy.blockedDomains.toList()))
         put("blocked_keywords", JSONArray(policy.blockedKeywords.toList()))
+        put("blocked_safety_categories", JSONArray(policy.blockedSafetyCategories.map { it.name }))
         put("block_youtube_shorts", policy.blockYoutubeShorts)
         put("require_app_approval", policy.requireAppApproval)
         put("approved_packages", JSONArray(policy.approvedPackages.toList()))
@@ -55,6 +57,9 @@ object PolicyJson {
             blockedPackages = data.stringSet("blocked_packages", emptySet()),
             blockedDomains = data.stringSet("blocked_domains", emptySet()),
             blockedKeywords = data.stringSet("blocked_keywords", emptySet()),
+            blockedSafetyCategories = data.stringSet("blocked_safety_categories", emptySet()).mapNotNull { raw ->
+                SafetyCategory.entries.firstOrNull { it.name == raw }
+            }.toSet(),
             blockYoutubeShorts = data.optBoolean("block_youtube_shorts", true),
             requireAppApproval = data.optBoolean("require_app_approval", true),
             approvedPackages = data.stringSet("approved_packages", emptySet()),

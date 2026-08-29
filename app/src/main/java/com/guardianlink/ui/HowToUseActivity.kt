@@ -28,7 +28,7 @@ class HowToUseActivity : android.app.Activity() {
         content.addView(guideCard("1", "Create your family", "Sign in, create one family, then choose Pair a child. A pairing code is single-use and expires after the time you choose."))
         content.addView(guideCard("2", "Choose a child device", "Each distinct child name appears once. Open a child card to see controls, the latest shared position, and its current protection rules."))
         content.addView(guideCard("3", "Use quick controls", "Pause managed apps, pause all child apps, set a 30-minute pause, or resume access. Use Delivery status to confirm the child device synced."))
-        content.addView(guideCard("4", "Set lasting rules", "Manage reported apps, approve new installations, choose bedtime, add blocked keywords, and control whether visible location sharing is enabled."))
+        content.addView(guideCard("4", "Set lasting rules", "Manage reported apps, approve new installations, choose bedtime, add browser category filters and blocked keywords, and control whether visible location sharing is enabled."))
         content.addView(guideCard("5", "Stay coordinated", "Quick Messages provides preset pickup and safety updates. Latest shared position is on the dashboard; older check-ins are in Location log."))
         content.addView(guideCard("6", "Respond to alerts", "Keep parent alerts enabled for SOS and app-approval notices. An SOS requires you to contact the child and stop the alarm when handled."))
     }
@@ -38,7 +38,7 @@ class HowToUseActivity : android.app.Activity() {
         content.addView(guideCard("2", "Activate protection", "Complete Step 5 only with a parent or guardian. Android then asks for notification and Usage Access permissions."))
         content.addView(guideCard("3", "Know what is visible", "Location sharing is optional, visibly indicated by an Android notification, and works only if the parent enables it."))
         content.addView(guideCard("4", "Ask for help", "Use SOS for urgent situations. The parent receives an alarm and should contact you. Use Quick Messages for non-urgent pickup and arrival updates."))
-        content.addView(guideCard("5", "Use the supervised browser", "The supervised browser applies parent keyword and YouTube Shorts rules. It does not read private messages or record the microphone/camera."))
+        content.addView(guideCard("5", "Use the supervised browser", "The supervised browser applies parent category, keyword, and YouTube Shorts rules. It does not read private messages or record the microphone/camera."))
     }
 
     private fun guideCard(number: String, title: String, body: String) = LinearLayout(this).apply {

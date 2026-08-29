@@ -22,6 +22,14 @@ data class SafePlace(
     val radiusMeters: Int
 )
 
+/** Browser-only categories. They are intentionally explicit rather than opaque AI classifications. */
+enum class SafetyCategory(val displayName: String) {
+    ADULT("Adult content"),
+    VIOLENCE("Graphic violence"),
+    GAMBLING("Gambling"),
+    SOCIAL_MEDIA("Social media websites")
+}
+
 data class ChildPolicy(
     val version: Int = 1,
     val paused: Boolean = false,
@@ -36,6 +44,8 @@ data class ChildPolicy(
     val dailyScreenLimitMinutes: Int = 0,
     val blockedDomains: Set<String> = emptySet(),
     val blockedKeywords: Set<String> = emptySet(),
+    /** Categories checked by the visible Guardian Link Family Browser. */
+    val blockedSafetyCategories: Set<SafetyCategory> = emptySet(),
     val blockYoutubeShorts: Boolean = true,
     /** Standard-mode installs are detected and blocked on first launch until approved. */
     val requireAppApproval: Boolean = true,

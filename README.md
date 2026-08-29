@@ -8,7 +8,7 @@ This repository contains no personal email, password, family ID, Supabase projec
 
 - Parent account sign-in and self-service account creation.
 - One-time parent/child pairing codes and multi-child families.
-- Parent controls for pause, schedules, selected-app blocking, new-app approval, and supervised browser rules.
+- Parent controls for pause, schedules, selected-app blocking, new-app approval, and supervised browser rules including adult, graphic-violence, gambling, and social-media website categories.
 - Daily screen-time allowance, selected-app daily limits, and parent-approved one-day bonus time.
 - Explicit, visible child location sharing, safe places, activity history, and SOS alerts.
 - Child-device health status (battery, Usage Access, protection setup, and today's screen time) plus soft device retirement.
@@ -81,7 +81,8 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 
 - Remote commands are polled by the child about every 30 seconds. Add FCM for lower-latency delivery at scale.
 - Standard Android mode detects a new app immediately after installation and blocks use until approved. True pre-install approval requires Device Owner enrollment on a dedicated/reset child device.
-- YouTube Shorts/keyword filtering is reliable in the supervised browser; it cannot selectively inspect the official YouTube app.
+- Category, YouTube Shorts, and keyword filtering is reliable in the supervised browser. Category checks use transparent on-device domain and page/search-term rules, need no paid API, and are not a complete content-classification service.
+- The app cannot selectively inspect the official YouTube app, Chrome, or other encrypted third-party apps. Block those apps from **Manage child apps** when required.
 - Location is opt-in and visibly indicated by an Android foreground-service notification.
 - Do not use the app for hidden monitoring, private-message capture, keystroke logging, camera/microphone collection, or screenshots.
 

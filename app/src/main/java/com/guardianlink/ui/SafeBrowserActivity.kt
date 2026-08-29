@@ -40,7 +40,7 @@ class SafeBrowserActivity : android.app.Activity() {
         bar.addView(go, LinearLayout.LayoutParams(dp(52), dp(48)))
         bar.addView(sync, LinearLayout.LayoutParams(dp(58), dp(48)))
         root.addView(bar)
-        status = TextView(this).apply { text = "Family browser • Websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(2), dp(14), dp(6)) }
+        status = TextView(this).apply { text = "Family browser • Category filters, websites, YouTube Shorts, and page keywords are checked here."; textSize = 12f; setTextColor(NoirUi.MUTED); setPadding(dp(14), dp(2), dp(14), dp(6)) }
         root.addView(status)
         browser = WebView(this).apply {
             settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = true
