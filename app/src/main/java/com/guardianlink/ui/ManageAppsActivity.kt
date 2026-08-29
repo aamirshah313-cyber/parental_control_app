@@ -35,6 +35,7 @@ class ManageAppsActivity : android.app.Activity() {
         content.addView(TextView(this).apply { text = "Select apps, then use a focused action below. Apps awaiting approval are called out clearly."; setTextColor(NoirUi.MUTED); setPadding(0, 0, 0, dp(10)) })
         status = TextView(this).apply { text = "Loading reported apps…"; setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); setBackgroundColor(NoirUi.SURFACE_RAISED) }
         content.addView(status)
+        content.addView(NoirUi.secondaryButton(this, "Refresh reported apps") { load() })
         load()
     }
 
@@ -52,10 +53,11 @@ class ManageAppsActivity : android.app.Activity() {
     }
 
     private fun render() {
-        while (content.childCount > 3) content.removeViewAt(3)
+        // Header, description, status, and refresh action stay mounted; only the changing inventory is rebuilt.
+        while (content.childCount > 5) content.removeViewAt(5)
         selected.clear()
         if (apps.isEmpty()) {
-            status.text = "No app inventory yet. Open the child app, sync rules, and wait a moment. Newly installed apps appear automatically after installation."
+            status.text = "No app inventory yet. On the child phone tap Refresh installed apps for parent, then tap Refresh reported apps here. If it remains empty, run the reported-apps Supabase migration."
             return
         }
         status.text = "${apps.size} reported app${if (apps.size == 1) "" else "s"}. ${apps.count { it.pendingApproval }} awaiting parent approval."

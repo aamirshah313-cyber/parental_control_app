@@ -40,6 +40,8 @@ Run these SQL files in the Supabase SQL Editor, in order:
 4. [`supabase/migrations/20260828_reported_apps.sql`](supabase/migrations/20260828_reported_apps.sql)
 5. [`supabase/migrations/20260829_family_quick_messages.sql`](supabase/migrations/20260829_family_quick_messages.sql)
 6. [`supabase/migrations/20260829_professional_controls.sql`](supabase/migrations/20260829_professional_controls.sql)
+7. [`supabase/migrations/20260829_sync_integrity.sql`](supabase/migrations/20260829_sync_integrity.sql)
+8. [`supabase/migrations/20260829_family_chat_voice.sql`](supabase/migrations/20260829_family_chat_voice.sql)
 
 Deploy the Edge Functions:
 
@@ -68,6 +70,12 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 3. Generate a one-time pairing code.
 4. Install the same APK on the child phone, choose child setup, and paste the code.
 5. Complete Step 5 on the child phone to grant the Android permissions required for protection and optional location.
+
+## Navigation and Guest mode
+
+- **Guest mode** opens directly into a full local demo dashboard. It does not require a login to explore controls, safety, app management, time requests, family communication, or Guardian Guide; it cannot access or change a real family’s data.
+- Detail pages return to their immediate Parent or Child hub with Android Back. Notification message shortcuts also create that hub in the Back stack.
+- See [`docs/APP_FLOW_ARCHITECTURE.md`](docs/APP_FLOW_ARCHITECTURE.md) for the complete route map and data-access boundaries.
 
 ## Product boundaries
 

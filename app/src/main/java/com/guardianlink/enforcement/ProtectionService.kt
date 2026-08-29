@@ -71,7 +71,11 @@ class ProtectionService : Service() {
         if (message.id == messagePrefs.getString("last_parent_message_id", null)) return
         messagePrefs.edit().putString("last_parent_message_id", message.id).apply()
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
-        val open = PendingIntent.getActivity(this, 2201, QuickMessagesActivity.childIntent(this), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        // Notification entry includes the child hub, preserving the same Back behaviour as an in-app visit.
+        val open = PendingIntent.getActivities(this, 2201, arrayOf(
+            Intent(this, com.guardianlink.ui.ChildModeActivity::class.java),
+            QuickMessagesActivity.childIntent(this)
+        ), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         getSystemService(NotificationManager::class.java).notify(2201, android.app.Notification.Builder(this, "protection")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle("Message from parent")

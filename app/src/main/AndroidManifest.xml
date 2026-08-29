@@ -8,6 +8,15 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Lets the child report launchable apps without requesting QUERY_ALL_PACKAGES. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"
@@ -20,6 +29,8 @@
         <activity android:name=".ui.TimeRequestsActivity" android:exported="false" />
         <activity android:name=".ui.LocationLogActivity" android:exported="false" />
         <activity android:name=".ui.QuickMessagesActivity" android:exported="false" />
+        <activity android:name=".ui.FamilyChatActivity" android:exported="false" />
+        <activity android:name=".ui.GuardianGuideActivity" android:exported="false" />
         <activity android:name=".ui.HowToUseActivity" android:exported="false" />
         <activity android:name=".ui.GuestPreviewActivity" android:exported="false" />
         <activity android:name=".ui.SosAlertActivity" android:exported="false" />

@@ -16,7 +16,8 @@ class PolicySynchronizer(private val context: Context) {
         val session = DeviceSessionStore(context)
         if (!session.isPaired()) return true
         val api = session.api() ?: return false
-        api.touchLastSeen()
+        // Do not tell the child that rules are synchronized if authentication, RLS, or the network rejected the device session.
+        if (!api.verifyDeviceSession() || !api.touchLastSeen()) return false
         AppInventoryReporter(context).reportIfDue()
         val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
             ?.let { it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1).takeIf { value -> value >= 0 } }

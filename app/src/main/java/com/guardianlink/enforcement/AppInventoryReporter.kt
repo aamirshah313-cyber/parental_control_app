@@ -16,7 +16,7 @@ class AppInventoryReporter(private val context: Context) {
     }
 
     /** User-visible child action: refresh the parent app list immediately, including launchable pre-installed apps. */
-    fun reportNow(): Boolean = report(launchableApps()).also { if (it) prefs.edit().putLong("last_report_at", System.currentTimeMillis()).apply() }
+    fun reportNow(): Boolean = replace(launchableApps()).also { if (it) prefs.edit().putLong("last_report_at", System.currentTimeMillis()).apply() }
 
     fun reportPackage(packageName: String, pendingApproval: Boolean) {
         val info = runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.getOrNull() ?: return
@@ -26,6 +26,11 @@ class AppInventoryReporter(private val context: Context) {
     private fun report(apps: List<ReportedAppPayload>): Boolean {
         val session = DeviceSessionStore(context)
         return session.api()?.upsertReportedApps(apps) ?: false
+    }
+
+    private fun replace(apps: List<ReportedAppPayload>): Boolean {
+        val session = DeviceSessionStore(context)
+        return session.api()?.replaceReportedApps(apps) ?: false
     }
 
     private fun launchableApps(): List<ReportedAppPayload> {

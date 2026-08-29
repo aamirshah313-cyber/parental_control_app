@@ -56,7 +56,8 @@ class LocationService : Service(), LocationListener {
         if (!session.isPaired()) return
         Thread {
             val api = session.api() ?: return@Thread
-            api.postLocation(location.latitude, location.longitude, location.accuracy.takeIf { location.hasAccuracy() })
+            // Do not emit a false "location updated" event or change safe-place state when the location row was rejected.
+            if (!api.postLocation(location.latitude, location.longitude, location.accuracy.takeIf { location.hasAccuracy() })) return@Thread
             api.postEvent("location_update", org.json.JSONObject().apply { put("accuracy_meters", location.accuracy) })
             reportSafePlaceTransitions(location, api)
         }.start()

@@ -87,7 +87,11 @@ class SosAlertService : Service() {
 
     private fun showQuickMessage(familyId: String, deviceId: String, deviceName: String, body: String) {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val open = PendingIntent.getActivity(this, deviceId.hashCode(), QuickMessagesActivity.parentIntent(this, familyId, deviceId, deviceName), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        // Build a real parent-hub -> conversation stack, so Back never drops a notification visitor at the launcher.
+        val open = PendingIntent.getActivities(this, deviceId.hashCode(), arrayOf(
+            Intent(this, ParentModeActivity::class.java),
+            QuickMessagesActivity.parentIntent(this, familyId, deviceId, deviceName)
+        ), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         getSystemService(NotificationManager::class.java).notify(2200 + (deviceId.hashCode() and 0x3ff), android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle("Message from $deviceName")

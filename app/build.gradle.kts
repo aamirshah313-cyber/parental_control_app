@@ -23,8 +23,8 @@ android {
         applicationId = appId
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.5.1"
+        versionCode = 11
+        versionName = "0.5.3"
 
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")

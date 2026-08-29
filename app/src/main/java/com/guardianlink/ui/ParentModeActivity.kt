@@ -283,6 +283,10 @@ class ParentModeActivity : android.app.Activity() {
         content.addView(section("Family setup & alerts"))
         content.addView(note("Pair a child once, keep parent alerts enabled, and use this area for account-level actions."))
         content.addView(actionRow("Pair a child" to { showPairingDialog() }, "Parent alerts" to { showAlertControls() }))
+        selectedDevice?.let { device ->
+            content.addView(secondaryButton("Family chat with ${device.displayName}") { family?.let { startActivity(FamilyChatActivity.parentIntent(this, it.id, device.id, device.displayName)) } })
+        }
+        content.addView(secondaryButton("Ask Guardian Guide") { startActivity(GuardianGuideActivity.intent(this, true)) })
         content.addView(secondaryButton("How to use this dashboard") { startActivity(HowToUseActivity.parentIntent(this)) })
         content.addView(secondaryButton("Refresh family status") { refreshFamily() })
         content.addView(secondaryButton("Sign out") { signOut() })

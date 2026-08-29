@@ -31,7 +31,7 @@ class SafeBrowserActivity : android.app.Activity() {
         super.onCreate(savedInstanceState)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(NoirUi.BACKGROUND) }
         val bar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; setPadding(dp(8), dp(8), dp(8), dp(4)) }
-        val back = Button(this).apply { text = "‹"; textSize = 24f; isAllCaps = false; setOnClickListener { if (browser.canGoBack()) browser.goBack() } }
+        val back = Button(this).apply { text = "‹"; textSize = 24f; isAllCaps = false; setOnClickListener { navigateBack() } }
         address = EditText(this).apply { hint = "Search or enter website"; setSingleLine(); textSize = 15f; setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED); background = rounded(NoirUi.SURFACE_RAISED) }
         val go = Button(this).apply { text = "Go"; isAllCaps = false; setOnClickListener { load(address.text.toString()) } }
         val sync = Button(this).apply { text = "Sync"; textSize = 12f; isAllCaps = false; setOnClickListener { syncRules(true) } }
@@ -53,6 +53,13 @@ class SafeBrowserActivity : android.app.Activity() {
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); incomingUrl(intent)?.let(::load) }
+
+    @Suppress("DEPRECATION")
+    override fun onBackPressed() = navigateBack()
+
+    private fun navigateBack() {
+        if (::browser.isInitialized && browser.canGoBack()) browser.goBack() else finish()
+    }
 
     private fun incomingUrl(intent: Intent): String? = intent.dataString ?: intent.getStringExtra(EXTRA_URL)
     private fun load(raw: String) {

@@ -17,7 +17,7 @@ import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
 import java.util.Locale
 
-/** Preset-only in-app family messages. It deliberately does not impersonate or send carrier SMS. */
+/** Preset in-app family messages; the separate family-chat screen offers typed chat and short voice notes. */
 class QuickMessagesActivity : android.app.Activity() {
     private lateinit var messages: LinearLayout
     private lateinit var state: TextView
@@ -34,7 +34,14 @@ class QuickMessagesActivity : android.app.Activity() {
         val person = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: if (isParent) "Child" else "Parent"
         root.addView(TextView(this).apply { text = "QUICK MESSAGES"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(BLUE) })
         root.addView(TextView(this).apply { text = "Stay coordinated with $person"; textSize = 27f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(5), 0, dp(4)) })
-        root.addView(TextView(this).apply { text = "Preset in-app messages only — no phone number, carrier SMS, or typed chat."; textSize = 14f; setTextColor(MUTED); setPadding(0, 0, 0, dp(10)) })
+        root.addView(TextView(this).apply { text = "Use a fast preset below, or open the private family chat for typed messages and short voice notes. No carrier SMS is used."; textSize = 14f; setTextColor(MUTED); setPadding(0, 0, 0, dp(10)) })
+        root.addView(Button(this).apply {
+            text = "Open family chat & voice notes"; isAllCaps = false; setTextColor(BLUE); background = outlined(); layoutParams = margins(4)
+            setOnClickListener {
+                if (isParent) startActivity(FamilyChatActivity.parentIntent(this@QuickMessagesActivity, intent.getStringExtra(EXTRA_FAMILY_ID) ?: return@setOnClickListener, intent.getStringExtra(EXTRA_DEVICE_ID) ?: return@setOnClickListener, person))
+                else startActivity(FamilyChatActivity.childIntent(this@QuickMessagesActivity))
+            }
+        })
         state = infoCard("Loading messages…")
         root.addView(state)
         root.addView(TextView(this).apply { text = if (isParent) "Send to child" else "Send to parent"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(16), 0, dp(6)) })

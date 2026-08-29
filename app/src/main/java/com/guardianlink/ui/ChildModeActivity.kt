@@ -105,6 +105,8 @@ class ChildModeActivity : android.app.Activity() {
             setOnClickListener { sendSos() }
         })
         root.addView(Button(this).apply { text = "Quick messages with parent"; setOnClickListener { startActivity(QuickMessagesActivity.childIntent(this@ChildModeActivity)) } })
+        root.addView(Button(this).apply { text = "Family chat & voice notes"; setOnClickListener { startActivity(FamilyChatActivity.childIntent(this@ChildModeActivity)) } })
+        root.addView(Button(this).apply { text = "Ask Guardian Guide"; setOnClickListener { startActivity(GuardianGuideActivity.intent(this@ChildModeActivity, false)) } })
         root.addView(Button(this).apply { text = "Open supervised browser"; setOnClickListener { startActivity(SafeBrowserActivity.intent(this@ChildModeActivity)) } })
         root.addView(Button(this).apply { text = "Use this as default browser"; setOnClickListener { requestDefaultBrowser() } })
         status = TextView(this).apply { setTextColor(NoirUi.GOLD); setPadding(dp(12), dp(10), dp(12), dp(10)); background = GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat() } }

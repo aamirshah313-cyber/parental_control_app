@@ -47,7 +47,8 @@ class LocationLogActivity : android.app.Activity() {
     }
 
     private fun render(locations: List<LocationRecord>) {
-        while (content.childCount > 4) content.removeViewAt(4)
+        // Keep the header, explanation, state, and Refresh action mounted; rebuild only the dynamic location cards.
+        while (content.childCount > 5) content.removeViewAt(5)
         if (locations.isEmpty()) { state.text = "No shared check-ins yet. Enable visible location sharing on the child phone, then wait for the next check-in."; return }
         state.text = "${locations.size} most recent shared check-in${if (locations.size == 1) "" else "s"}"
         locations.forEach { content.addView(locationCard(it)) }

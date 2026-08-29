@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.view.Gravity
 import android.widget.Button
 import android.widget.TextView
@@ -23,6 +24,13 @@ object NoirUi {
     fun rounded(context: Context, fill: Int = SURFACE, stroke: Int = SURFACE_RAISED, radius: Int = 20) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(context, radius).toFloat(); setStroke(dp(context, 1), stroke)
     }
+    /** Touchable states make controls clear on touch screens and when a keyboard or mouse is used. */
+    fun interactiveBackground(context: Context, normal: Int = SURFACE, active: Int = SURFACE_RAISED, stroke: Int = SURFACE_RAISED, radius: Int = 20) = StateListDrawable().apply {
+        addState(intArrayOf(android.R.attr.state_pressed), rounded(context, GOLD_DIM, GOLD, radius))
+        addState(intArrayOf(android.R.attr.state_hovered), rounded(context, active, GOLD_DIM, radius))
+        addState(intArrayOf(android.R.attr.state_selected), rounded(context, active, GOLD, radius))
+        addState(intArrayOf(), rounded(context, normal, stroke, radius))
+    }
     fun title(context: Context, text: String) = TextView(context).apply {
         this.text = text; textSize = 28f; setTextColor(TEXT); typeface = android.graphics.Typeface.create("serif", android.graphics.Typeface.NORMAL)
     }
@@ -30,10 +38,10 @@ object NoirUi {
         this.text = text.uppercase(); textSize = 11f; letterSpacing = .14f; setTextColor(GOLD); typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
     fun primaryButton(context: Context, text: String, action: () -> Unit) = Button(context).apply {
-        this.text = text; isAllCaps = false; setTextColor(BACKGROUND); textSize = 14f; backgroundTintList = ColorStateList.valueOf(GOLD); minHeight = dp(context, 48); setOnClickListener { action() }
+        this.text = text; isAllCaps = false; setTextColor(BACKGROUND); textSize = 14f; background = interactiveBackground(context, GOLD, GOLD_DIM, GOLD_DIM, 16); minHeight = dp(context, 48); setOnClickListener { action() }
     }
     fun secondaryButton(context: Context, text: String, action: () -> Unit) = Button(context).apply {
-        this.text = text; isAllCaps = false; setTextColor(TEXT); textSize = 14f; background = rounded(context); minHeight = dp(context, 48); setOnClickListener { action() }
+        this.text = text; isAllCaps = false; setTextColor(TEXT); textSize = 14f; background = interactiveBackground(context); minHeight = dp(context, 48); setOnClickListener { action() }
     }
     fun avatar(context: Context, initials: String) = TextView(context).apply {
         text = initials.take(2).uppercase(); textSize = 17f; gravity = Gravity.CENTER; setTextColor(BACKGROUND); typeface = android.graphics.Typeface.DEFAULT_BOLD
