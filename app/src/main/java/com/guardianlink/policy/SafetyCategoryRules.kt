@@ -31,19 +31,19 @@ object SafetyCategoryRules {
         )
     )
 
-    fun decision(categories: Set<SafetyCategory>, url: String, titleOrVisibleText: String): EnforcementDecision? {
+    fun decision(categories: Set<SafetyCategory>, url: String, titleOrVisibleText: String): EnforcementDecision? =
+        matchingCategory(categories, url, titleOrVisibleText)?.let { category ->
+            EnforcementDecision(true, "${category.displayName} is blocked by family safety filters")
+        }
+
+    fun matchingCategory(categories: Set<SafetyCategory>, url: String, titleOrVisibleText: String): SafetyCategory? {
         if (categories.isEmpty()) return null
         val host = runCatching { java.net.URI(url).host.orEmpty().lowercase() }.getOrDefault("")
         val page = "$url $titleOrVisibleText".lowercase()
-        return categories.sortedBy { it.ordinal }.firstNotNullOfOrNull { category ->
+        return categories.sortedBy { it.ordinal }.firstOrNull { category ->
             val rule = rules.getValue(category)
-            when {
-                rule.domains.any { domain -> host == domain || host.endsWith(".$domain") } ->
-                    EnforcementDecision(true, "${category.displayName} is blocked by family safety filters")
-                rule.terms.any { term -> page.contains(term) } ->
-                    EnforcementDecision(true, "${category.displayName} is blocked by family safety filters")
-                else -> null
-            }
+            rule.domains.any { domain -> host == domain || host.endsWith(".$domain") } ||
+                rule.terms.any { term -> page.contains(term) }
         }
     }
 }

@@ -58,6 +58,7 @@ class ActivityTimelineActivity : android.app.Activity() {
         "app_installed" -> "New app detected: ${event.details.optString("package_name", "Unknown app")}" 
         "shorts_block" -> "YouTube Shorts blocked in supervised browser"
         "keyword_block" -> "Blocked keyword detected in supervised browser"
+        "category_block" -> "${event.details.optString("category", "Safety category").replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }} blocked in supervised browser"
         "schedule_block" -> "Bedtime or schedule block applied"
         "location_update" -> "Location check-in recorded"
         else -> event.eventType.replace('_', ' ').replaceFirstChar { it.uppercase() }

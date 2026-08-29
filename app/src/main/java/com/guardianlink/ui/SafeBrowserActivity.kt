@@ -15,6 +15,8 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.guardianlink.policy.PolicyEngine
 import com.guardianlink.policy.PolicyStore
+import com.guardianlink.policy.SafetyCategoryRules
+import com.guardianlink.sync.DeviceSessionStore
 import com.guardianlink.sync.PolicySynchronizer
 import org.json.JSONTokener
 
@@ -25,6 +27,7 @@ class SafeBrowserActivity : android.app.Activity() {
     private lateinit var status: TextView
     private val store by lazy { PolicyStore(this) }
     private val engine = PolicyEngine()
+    private val categoryAuditPrefs by lazy { getSharedPreferences("browser_category_audit", MODE_PRIVATE) }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,18 +89,35 @@ class SafeBrowserActivity : android.app.Activity() {
     }
 
     private fun enforce(url: String, visibleText: String) {
-        val decision = engine.pageDecision(store.load(), url, visibleText)
+        val policy = store.load()
+        val decision = engine.pageDecision(policy, url, visibleText)
         if (decision.blocked) {
+            recordCategoryBlock(policy, url, visibleText)
             browser.stopLoading()
             startActivity(BlockingActivity.intent(this, decision.reason ?: "Blocked", "browser"))
         }
     }
 
+    /** Sends a privacy-minimised audit record at most once per category per ten minutes. */
+    private fun recordCategoryBlock(policy: com.guardianlink.model.ChildPolicy, url: String, visibleText: String) {
+        val category = SafetyCategoryRules.matchingCategory(policy.blockedSafetyCategories, url, visibleText) ?: return
+        val key = "${category.name}_last_sent"
+        val now = System.currentTimeMillis()
+        if (now - categoryAuditPrefs.getLong(key, 0) < CATEGORY_AUDIT_COOLDOWN_MS) return
+        categoryAuditPrefs.edit().putLong(key, now).apply()
+        Thread {
+            // Deliberately omit URL, page text, and search terms from the family audit trail.
+            DeviceSessionStore(this).api()?.postEvent("category_block", org.json.JSONObject().apply { put("category", category.name) })
+        }.start()
+    }
+
     private inner class FilterClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url.toString()
-            val decision = engine.pageDecision(store.load(), url, "")
+            val policy = store.load()
+            val decision = engine.pageDecision(policy, url, "")
             if (!decision.blocked) return false
+            recordCategoryBlock(policy, url, "")
             startActivity(BlockingActivity.intent(this@SafeBrowserActivity, decision.reason ?: "Blocked", "browser"))
             return true
         }
@@ -116,6 +136,7 @@ class SafeBrowserActivity : android.app.Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object {
         private const val EXTRA_URL = "url"
+        private const val CATEGORY_AUDIT_COOLDOWN_MS = 10 * 60 * 1_000L
         fun intent(context: android.content.Context, url: String = "https://www.google.com") = Intent(context, SafeBrowserActivity::class.java).putExtra(EXTRA_URL, url)
     }
 }

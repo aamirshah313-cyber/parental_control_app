@@ -42,6 +42,7 @@ Run these SQL files in the Supabase SQL Editor, in order:
 6. [`supabase/migrations/20260829_professional_controls.sql`](supabase/migrations/20260829_professional_controls.sql)
 7. [`supabase/migrations/20260829_sync_integrity.sql`](supabase/migrations/20260829_sync_integrity.sql)
 8. [`supabase/migrations/20260829_family_chat_voice.sql`](supabase/migrations/20260829_family_chat_voice.sql)
+9. [`supabase/migrations/20260829_category_safety_events.sql`](supabase/migrations/20260829_category_safety_events.sql)
 
 Deploy the Edge Functions:
 
@@ -82,6 +83,7 @@ The debug APK is created at `app/build/outputs/apk/debug/app-debug.apk`.
 - Remote commands are polled by the child about every 30 seconds. Add FCM for lower-latency delivery at scale.
 - Standard Android mode detects a new app immediately after installation and blocks use until approved. True pre-install approval requires Device Owner enrollment on a dedicated/reset child device.
 - Category, YouTube Shorts, and keyword filtering is reliable in the supervised browser. Category checks use transparent on-device domain and page/search-term rules, need no paid API, and are not a complete content-classification service.
+- Category blocks appear in Safety activity with only the category and time; URLs, page text, and search terms are not recorded.
 - The app cannot selectively inspect the official YouTube app, Chrome, or other encrypted third-party apps. Block those apps from **Manage child apps** when required.
 - Location is opt-in and visibly indicated by an Android foreground-service notification.
 - Do not use the app for hidden monitoring, private-message capture, keystroke logging, camera/microphone collection, or screenshots.

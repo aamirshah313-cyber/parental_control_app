@@ -49,7 +49,7 @@ create table public.device_acknowledgements (
 create table public.device_events (
   id uuid primary key default gen_random_uuid(),
   device_id uuid not null references public.devices(id) on delete cascade,
-  event_type text not null check (event_type in ('limit_reached', 'schedule_block', 'keyword_block', 'shorts_block')),
+  event_type text not null check (event_type in ('limit_reached', 'schedule_block', 'keyword_block', 'shorts_block', 'category_block')),
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
