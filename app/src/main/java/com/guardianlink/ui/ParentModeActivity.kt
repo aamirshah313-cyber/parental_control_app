@@ -462,7 +462,14 @@ class ParentModeActivity : android.app.Activity() {
             val loadedFamily = api.families().firstOrNull()
             val devices = if (loadedFamily == null) emptyList() else api.devices(loadedFamily.id)
             // Rows are paired and ordered by check-in, so the default is the most recently live child channel.
-            val deviceToShow = devices.firstOrNull { it.id == selectedDevice?.id } ?: devices.firstOrNull()
+            // A re-pair of an already-paired child creates a new device row rather than reusing the old
+            // one (two real children may share a display name), so the old id can silently drop out of
+            // this de-duplicated list. Stay on the same-named child in that case instead of falling
+            // through to an unrelated device and pointing chat/notifications at a dead device id.
+            val previouslySelected = selectedDevice
+            val deviceToShow = devices.firstOrNull { it.id == previouslySelected?.id }
+                ?: devices.firstOrNull { it.displayName == previouslySelected?.displayName }
+                ?: devices.firstOrNull()
             val remotePolicy = deviceToShow?.let { api.activePolicy(it.id) }
             runOnUiThread {
                 family = loadedFamily
