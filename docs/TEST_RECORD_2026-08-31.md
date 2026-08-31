@@ -131,6 +131,23 @@ sanity check joining every existing `family_messages`/`family_notifications` row
 0 rows have a `family_id` that disagrees with their device's real family, so the corrected,
 now-enforcing policy does not newly hide or reject any existing data.
 
+## Supabase security-advisor findings
+
+`get_advisors(type: security)` was run before and after the two fixes above. It reported four
+findings, none of which are the chat/notification root cause — recorded here because they were
+found in the same project during this pass and two were safe, in-scope fixes.
+
+| Finding | Action | Why |
+| --- | --- | --- |
+| `function_search_path_mutable` on `guardian_limit_notification_update` | **Fixed live.** `alter function ... set search_path = ''` | The trigger function makes no schema-qualified reference (only `to_jsonb`/`NEW`/`OLD`, resolved via `pg_catalog`), so pinning an empty search_path is safe and fully closes the finding. |
+| `anon_security_definer_function_executable` on `complete_child_command` | **Fixed live.** `revoke execute ... from anon` | The function was reachable by unauthenticated callers via `/rest/v1/rpc/complete_child_command`. It was not actually exploitable — the function checks `d.child_auth_user_id = auth.uid()` internally, and `auth.uid()` is `null` for `anon`, so no row ever matched — but anon never has a legitimate reason to call it, so the grant was needless attack surface. |
+| `authenticated_security_definer_function_executable` on `complete_child_command` | **Not changed — reviewed and intentional.** | This is the function's real, load-bearing use: a paired child's authenticated JWT calls it to mark its own command as processed (`SupabaseApi.markCommandProcessed`, used by P04/P07's delivery-receipt flow). Revoking `authenticated` execute would break that flow. `SECURITY DEFINER` is required here so the child's limited-grant role can update `parent_commands`; the function already scopes the update to the caller's own device internally, so this is the correct shape, not a bug. |
+| `auth_leaked_password_protection` | **Not fixed — no tool access.** | This is an Auth-service setting (HaveIBeenPwned check on sign-up/password-change), not a SQL object; none of the available Supabase MCP tools expose writing Auth config, and doing it via a raw Management API call would need a token this session doesn't have. Enable it manually: Supabase Dashboard → Authentication → Sign In / Providers (or Policies, depending on dashboard version) → Password → "Leaked password protection". |
+
+Fixes applied in `supabase/migrations/20260831_close_security_advisor_findings.sql`, applied
+live via `apply_migration` and confirmed with a follow-up `get_advisors` call (both target
+findings gone from the report; only the two "not changed" rows above remain).
+
 ## Build status
 
 `:app:assembleDebug` could not be run in this container: `ANDROID_HOME`/`local.properties` are
