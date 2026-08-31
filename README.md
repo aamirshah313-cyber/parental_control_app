@@ -4,6 +4,10 @@ An Android-first, self-hosted parental-control starter app. Any parent can creat
 
 This repository contains no personal email, password, family ID, Supabase project URL, or API key.
 
+## Engineering handoff and verification
+
+For a reproducible Claude Code handoff, start with [`CLAUDE.md`](CLAUDE.md) and the detailed [`docs/CLAUDE_HANDOFF.md`](docs/CLAUDE_HANDOFF.md). They document the safe local configuration boundary, current build baseline, Supabase migration caveat, known unverified synchronization issue, and the required two-device acceptance matrix.
+
 ## What it includes
 
 - Parent account sign-in and self-service account creation.
@@ -43,6 +47,11 @@ Run these SQL files in the Supabase SQL Editor, in order:
 7. [`supabase/migrations/20260829_sync_integrity.sql`](supabase/migrations/20260829_sync_integrity.sql)
 8. [`supabase/migrations/20260829_family_chat_voice.sql`](supabase/migrations/20260829_family_chat_voice.sql)
 9. [`supabase/migrations/20260829_category_safety_events.sql`](supabase/migrations/20260829_category_safety_events.sql)
+10. [`supabase/migrations/20260829_command_delivery_queue.sql`](supabase/migrations/20260829_command_delivery_queue.sql)
+11. [`supabase/migrations/20260829_unified_family_communication.sql`](supabase/migrations/20260829_unified_family_communication.sql)
+12. [`supabase/migrations/20260829_harden_command_receipts.sql`](supabase/migrations/20260829_harden_command_receipts.sql)
+13. [`supabase/migrations/20260830_family_notifications.sql`](supabase/migrations/20260830_family_notifications.sql)
+14. [`supabase/migrations/20260830_harden_family_delivery.sql`](supabase/migrations/20260830_harden_family_delivery.sql)
 
 Deploy the Edge Functions:
 

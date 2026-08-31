@@ -18,6 +18,7 @@ class ActivityTimelineActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
         val name = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Child device"

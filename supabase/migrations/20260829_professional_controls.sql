@@ -42,6 +42,7 @@ create table if not exists public.device_health (
   protection_active boolean not null default false,
   usage_access_available boolean not null default false,
   screen_minutes_today integer not null default 0 check (screen_minutes_today >= 0),
+  applied_policy_version integer check (applied_policy_version >= 0),
   reported_at timestamptz not null default now()
 );
 alter table public.device_health enable row level security;

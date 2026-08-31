@@ -21,6 +21,7 @@ class TimeRequestsActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(24)); setBackgroundColor(NoirUi.BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
         content.addView(TextView(this).apply { text = "TIME REQUESTS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD) })
@@ -78,7 +79,7 @@ class TimeRequestsActivity : android.app.Activity() {
         addView(compact(first, firstAction), LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(0, 0, dp(4), 0) })
         addView(compact(second.first, second.second), LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(dp(4), 0, 0, 0) })
     }
-    private fun compact(text: String, action: () -> Unit) = Button(this).apply { this.text = text; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); setOnClickListener { action() } }
+    private fun compact(text: String, action: () -> Unit) = Button(this).apply { this.text = text; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); background = NoirUi.interactiveBackground(this@TimeRequestsActivity, NoirUi.GOLD, NoirUi.GOLD_DIM, NoirUi.GOLD_DIM, 14); setOnClickListener { action() } }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object { private const val EXTRA_DEVICE_ID = "device_id"; fun intent(context: android.content.Context, deviceId: String) = android.content.Intent(context, TimeRequestsActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId) }
 }

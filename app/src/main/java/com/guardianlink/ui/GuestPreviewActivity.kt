@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 
 /** A local, interactive product preview. It contains no account, child, or location data. */
@@ -18,6 +19,7 @@ class GuestPreviewActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(24), dp(20), dp(28)); setBackgroundColor(BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(BACKGROUND); addView(content) })
         // Guest mode opens directly into the working local demo. It never asks for a login to explore the product.
@@ -39,7 +41,11 @@ class GuestPreviewActivity : android.app.Activity() {
         content.addView(navRow("Safety" to { showSafety() }, "Family" to { showFamily() }))
         content.addView(section("Maya’s phone"))
         content.addView(note("Protection active • 42% battery\nLast check-in: just now • 68 minutes today"))
-        content.addView(navRow(if (paused) "Resume access" to { paused = false; showDashboard() } else "Pause all apps" to { paused = true; showDashboard() }, "View location" to { showSafety() }))
+        content.addView(Switch(this).apply {
+            text = "Pause child access (demo)"; textSize = 15f; setTextColor(NAVY); isChecked = paused
+            setOnCheckedChangeListener { _, enabled -> paused = enabled; showDashboard() }
+        })
+        content.addView(secondary("View location") { showSafety() })
         content.addView(section("Latest shared position"))
         content.addView(note("School area • updated 3 minutes ago\nA real dashboard opens Google Maps only when location sharing is enabled."))
         status = note(if (paused) "Demo: child access is paused." else "Demo: access is currently available.")
@@ -49,7 +55,11 @@ class GuestPreviewActivity : android.app.Activity() {
     private fun showControls() {
         page = GuestPage.CONTROLS
         content.removeAllViews(); content.addView(eyebrow("DEMO • CONTROLS")); content.addView(title("Maya’s controls")); content.addView(note("Each section has a single purpose. In the real app, changes are sent to the paired child device."))
-        content.addView(navRow("Pause & bedtime" to { paused = !paused; showControls() }, "App controls" to { showAppDemo() }))
+        content.addView(Switch(this).apply {
+            text = "Pause child access (demo)"; textSize = 15f; setTextColor(NAVY); isChecked = paused
+            setOnCheckedChangeListener { _, enabled -> paused = enabled; showControls() }
+        })
+        content.addView(secondary("App controls") { showAppDemo() })
         content.addView(navRow("Daily allowance" to { showMessage("Demo: daily allowance editor opens here.") }, "Time requests" to { showTimeDemo() }))
         content.addView(note(if (paused) "Demo state: all child apps are paused." else "Demo state: access is available. Tap Pause & bedtime to preview an instant stop."))
         content.addView(secondary("Back to overview") { showDashboard() })
@@ -111,5 +121,11 @@ class GuestPreviewActivity : android.app.Activity() {
         addState(intArrayOf(), rounded(normal, stroke))
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    private companion object { const val BACKGROUND = 0xFF17181E.toInt(); const val NAVY = 0xFFF5F2EA.toInt(); const val MUTED = 0xFFAFAFBA.toInt(); const val BLUE = 0xFFD8B65B.toInt(); const val BORDER = 0xFF2B2D36.toInt() }
+    private companion object {
+        val BACKGROUND get() = NoirUi.BACKGROUND
+        val NAVY get() = NoirUi.TEXT
+        val MUTED get() = NoirUi.MUTED
+        val BLUE get() = NoirUi.GOLD
+        val BORDER get() = NoirUi.SURFACE_RAISED
+    }
 }

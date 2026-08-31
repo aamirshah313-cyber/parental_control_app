@@ -38,7 +38,8 @@ class GuardianGuideActivity : android.app.Activity() {
     private fun ask() {
         val text = question.text.toString().trim()
         if (text.isBlank()) return
-        addBubble("You", text, true)
+        // This is a FAQ-style guide, not a persistent transcript: show only the current answer.
+        conversation.removeAllViews()
         question.setText("")
         addGuide(answerFor(text.lowercase()))
     }

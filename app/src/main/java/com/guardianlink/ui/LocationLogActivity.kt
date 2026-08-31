@@ -21,6 +21,7 @@ class LocationLogActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(22), dp(20), dp(28)); setBackgroundColor(BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(BACKGROUND); addView(content) })
         val name = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Child device"
@@ -70,11 +71,11 @@ class LocationLogActivity : android.app.Activity() {
     companion object {
         const val EXTRA_DEVICE_ID = "device_id"
         const val EXTRA_DEVICE_NAME = "device_name"
-        const val BACKGROUND = 0xFF17181E.toInt()
-        const val NAVY = 0xFFF5F2EA.toInt()
-        const val MUTED = 0xFFAFAFBA.toInt()
-        const val BLUE = 0xFFD8B65B.toInt()
-        const val BORDER = 0xFF2B2D36.toInt()
+        val BACKGROUND get() = NoirUi.BACKGROUND
+        val NAVY get() = NoirUi.TEXT
+        val MUTED get() = NoirUi.MUTED
+        val BLUE get() = NoirUi.GOLD
+        val BORDER get() = NoirUi.SURFACE_RAISED
         fun intent(context: android.content.Context, deviceId: String, deviceName: String) =
             android.content.Intent(context, LocationLogActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).putExtra(EXTRA_DEVICE_NAME, deviceName)
     }

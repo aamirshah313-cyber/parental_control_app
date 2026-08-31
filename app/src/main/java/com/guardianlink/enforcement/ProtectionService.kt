@@ -49,7 +49,7 @@ class ProtectionService : Service() {
         val packageName = monitor.currentForegroundPackage() ?: return
         if (packageName == applicationContext.packageName) return
         val policy = store.load()
-        val allowance = policy.dailyScreenLimitMinutes + store.dailyBonusMinutes()
+        val allowance = if (policy.dailyScreenLimitMinutes > 0) policy.dailyScreenLimitMinutes + store.dailyBonusMinutes() else 0
         val effectivePolicy = if (allowance == policy.dailyScreenLimitMinutes) policy else policy.copy(dailyScreenLimitMinutes = allowance)
         val decision = engine.appDecision(effectivePolicy, packageName, monitor.usedMinutesToday(packageName), monitor.totalScreenMinutesToday())
         if (decision.blocked && packageName != lastBlockedPackage) {
@@ -67,20 +67,29 @@ class ProtectionService : Service() {
     }
 
     private fun checkForParentMessage() {
-        val message = com.guardianlink.sync.DeviceSessionStore(this).api()?.latestQuickMessage("parent") ?: return
-        if (message.id == messagePrefs.getString("last_parent_message_id", null)) return
-        messagePrefs.edit().putString("last_parent_message_id", message.id).apply()
+        val api = com.guardianlink.sync.DeviceSessionStore(this).api() ?: return
+        val notification = api.latestNotification()
+        val message = api.latestChatMessage("parent")
+        // The in-app inbox is the delivery source. The chat fallback keeps older database
+        // deployments able to show an Android alert until the notification migration is applied.
+        val key = notification?.id ?: message?.id ?: return
+        if (key == messagePrefs.getString("last_parent_message_id", null)) return
+        messagePrefs.edit().putString("last_parent_message_id", key).apply()
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
         // Notification entry includes the child hub, preserving the same Back behaviour as an in-app visit.
+        val eventType = notification?.eventType ?: message?.messageKind ?: "chat"
+        val body = notification?.body ?: message?.body?.ifBlank { "New voice note" } ?: "New message from parent"
+        val destination = if (eventType == "quick_update") QuickMessagesActivity.childIntent(this)
+        else com.guardianlink.ui.FamilyChatActivity.childIntent(this)
         val open = PendingIntent.getActivities(this, 2201, arrayOf(
             Intent(this, com.guardianlink.ui.ChildModeActivity::class.java),
-            QuickMessagesActivity.childIntent(this)
+            destination
         ), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         getSystemService(NotificationManager::class.java).notify(2201, android.app.Notification.Builder(this, "protection")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle("Message from parent")
-            .setContentText(message.body)
-            .setStyle(android.app.Notification.BigTextStyle().bigText(message.body))
+            .setContentText(body)
+            .setStyle(android.app.Notification.BigTextStyle().bigText(body))
             .setContentIntent(open)
             .setAutoCancel(true)
             .build())

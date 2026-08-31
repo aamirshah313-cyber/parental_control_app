@@ -2,6 +2,7 @@ package com.guardianlink.ui
 
 import android.Manifest
 import android.app.role.RoleManager
+import android.app.AppOpsManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -86,10 +87,19 @@ class ChildModeActivity : android.app.Activity() {
             return
         }
 
-        content.addView(actionRow("Sync rules" to { syncRules() }, "Activate protection" to { completeStepFive() }))
-        content.addView(note("Activation opens Android’s visible notification and Usage Access settings. It never enables hidden monitoring."))
+        content.addView(actionRow("Sync rules" to { syncRules() }, "Check readiness" to { checkDeviceReadiness() }))
+        val protection = Switch(this).apply {
+            text = "Protection monitoring"; textSize = 15f; setTextColor(NoirUi.TEXT)
+            isChecked = setupPrefs.getBoolean("permissions_unlocked", false)
+            setOnCheckedChangeListener { _, enabled -> setProtectionEnabled(this, enabled) }
+        }
+        content.addView(protection, margins(4))
+        content.addView(note("Turn this on to complete Android’s visible notification and Usage Access setup. Turning it off stops Guardian Link’s protection service on this phone."))
+        content.addView(NoirUi.secondaryButton(this, "Re-pair with a new parent code") { showRePairing() }.apply { layoutParams = margins(4) })
+        content.addView(note("Use this only when a parent has retired this device and created a new one-time code. It replaces this phone’s local family connection after the new code is accepted."))
         content.addView(sectionTitle("Keep your parent informed"))
-        content.addView(actionRow("Refresh installed apps" to { refreshInstalledApps() }, "Request extra time" to { requestMoreTime() }))
+        content.addView(NoirUi.secondaryButton(this, "Refresh installed apps") { refreshInstalledApps() }.apply { layoutParams = margins(4) })
+        content.addView(note("Use Connect → Ask parent for extra time when you need more of an active daily allowance."))
     }
 
     private fun buildSafety(paired: Boolean) {
@@ -101,8 +111,15 @@ class ChildModeActivity : android.app.Activity() {
         content.addView(actionRow("Open Family Browser" to { startActivity(SafeBrowserActivity.intent(this)) }, "Make it default" to { requestDefaultBrowser() }))
         content.addView(note("Category filters, websites, YouTube Shorts, and custom keywords are checked only in Family Browser. Your parent controls these rules."))
         content.addView(sectionTitle("Visible location"))
-        content.addView(NoirUi.secondaryButton(this, "Start location sharing") { startLocationSharingAfterSetup() }.apply { layoutParams = margins(6) })
-        content.addView(note("Location requires parent consent, your Android permission, and an always-visible Android notification."))
+        val parentLocationAllowed = com.guardianlink.policy.PolicyStore(this).load().locationEnabled
+        val location = Switch(this).apply {
+            text = "Share location with parent"; textSize = 15f; setTextColor(NoirUi.TEXT)
+            isEnabled = paired && parentLocationAllowed
+            isChecked = setupPrefs.getBoolean(CHILD_LOCATION_ENABLED, false)
+            setOnCheckedChangeListener { _, enabled -> setLocationSharingEnabled(this, enabled) }
+        }
+        content.addView(location, margins(4))
+        content.addView(note(if (parentLocationAllowed) "This toggle controls this phone’s visible location service. Android shows a persistent notification while it is on." else "Your parent has not enabled location sharing for this child yet. The toggle becomes available after the next rule sync."))
     }
 
     private fun buildConnect(paired: Boolean) {
@@ -110,6 +127,7 @@ class ChildModeActivity : android.app.Activity() {
         if (!paired) content.addView(note("Pair this device before sending updates or messages to a parent."))
         content.addView(actionRow("Quick updates" to { startActivity(QuickMessagesActivity.childIntent(this)) }, "Family chat" to { startActivity(FamilyChatActivity.childIntent(this)) }))
         content.addView(note("Quick updates show only the latest preset message. Use Family Chat for a full typed or voice-note conversation."))
+        content.addView(NoirUi.secondaryButton(this, "Notifications") { startActivity(NotificationsActivity.childIntent(this)) }.apply { layoutParams = margins(6) })
         content.addView(NoirUi.secondaryButton(this, "Ask parent for extra time") { requestMoreTime() }.apply { layoutParams = margins(6) })
     }
 
@@ -125,14 +143,28 @@ class ChildModeActivity : android.app.Activity() {
         content.addView(note("The Guardian Guide is an on-device help tool. It does not send your questions to a cloud AI service."))
     }
 
-    private fun pair(code: String) {
+    private fun showRePairing() {
+        val code = EditText(this).apply {
+            hint = "Paste new one-time pairing code"; setSingleLine(); setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED)
+            background = NoirUi.rounded(this@ChildModeActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 14); setPadding(dp(14), dp(4), dp(14), dp(4))
+        }
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Re-pair this device?")
+            .setMessage("Ask the parent to retire the old child entry first, then create a new code. A successful new code replaces this phone’s local pairing.")
+            .setView(code)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Replace pairing") { _, _ -> pair(code.text.toString(), replacingExisting = true) }
+            .show()
+    }
+
+    private fun pair(code: String, replacingExisting: Boolean = false) {
         val existingSession = DeviceSessionStore(this)
-        if (existingSession.isPaired()) { showStatus("This device is already paired. Syncing rules…"); syncRules(); return }
+        if (existingSession.isPaired() && !replacingExisting) { showStatus("This device is already paired. Syncing rules…"); syncRules(); return }
         if (code.isBlank()) { showStatus("Paste the pairing code from the parent app first."); return }
         if (pairingInProgress) return
         pairingInProgress = true; showStatus("Pairing this device…")
         Thread {
-            val result = PairingClient().claim(code, android.os.Build.MODEL)
+            val result = PairingClient().claim(code, "")
             runOnUiThread {
                 pairingInProgress = false
                 if (result == null) showStatus("Pairing failed. The code may be expired, already used, or the connection is unavailable.")
@@ -162,16 +194,56 @@ class ChildModeActivity : android.app.Activity() {
         showStatus("Enable Usage Access for ${getString(R.string.app_name)}, then return here. Protection is starting.")
     }
 
-    private fun startLocationSharingAfterSetup() {
-        if (!DeviceSessionStore(this).isPaired()) { showStatus("Pair this device before starting visible location sharing."); return }
-        if (!setupPrefs.getBoolean("permissions_unlocked", false)) { showStatus("Activate protection from Home before enabling optional location sharing."); return }
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 15)
-            showStatus("Allow location only if your parent has enabled visible location sharing.")
+    private fun setProtectionEnabled(toggle: Switch, enabled: Boolean) {
+        if (enabled) {
+            if (!DeviceSessionStore(this).isPaired()) { toggle.isChecked = false; showStatus("Pair this phone before enabling protection."); return }
+            completeStepFive()
+        } else {
+            setupPrefs.edit().putBoolean("permissions_unlocked", false).apply()
+            stopService(Intent(this, ProtectionService::class.java))
+            stopService(Intent(this, LocationService::class.java))
+            showStatus("Protection monitoring is off on this phone. Android Usage Access can still be changed in Settings.")
+        }
+    }
+
+    /** Makes every prerequisite visible instead of reporting a generic sync or protection failure. */
+    private fun checkDeviceReadiness() {
+        val paired = DeviceSessionStore(this).isPaired()
+        val appOps = getSystemService(AppOpsManager::class.java)
+        val usageReady = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), packageName) == AppOpsManager.MODE_ALLOWED
+        val notificationsReady = android.os.Build.VERSION.SDK_INT < 33 || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val setupReady = setupPrefs.getBoolean("permissions_unlocked", false)
+        val policy = com.guardianlink.policy.PolicyStore(this).load()
+        val locationReady = !policy.locationEnabled || (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)
+        val problems = buildList {
+            if (!paired) add("pairing is missing")
+            if (!setupReady) add("protection activation is incomplete")
+            if (!usageReady) add("Usage Access is off")
+            if (!notificationsReady) add("notifications are blocked")
+            if (!locationReady) add("location permission is needed for the parent’s enabled location rule")
+        }
+        showStatus(if (problems.isEmpty()) "Device readiness: all local requirements are ready. Rules v${policy.version} are stored on this phone." else "Device readiness needs attention: ${problems.joinToString("; ")}. Open Activate protection or Location sharing to resolve it.")
+    }
+
+    private fun setLocationSharingEnabled(toggle: Switch, enabled: Boolean) {
+        if (!enabled) {
+            setupPrefs.edit().putBoolean(CHILD_LOCATION_ENABLED, false).apply()
+            stopService(Intent(this, LocationService::class.java))
+            showStatus("Location sharing is off on this phone.")
             return
         }
+        if (!DeviceSessionStore(this).isPaired()) { toggle.isChecked = false; showStatus("Pair this device before enabling visible location sharing."); return }
+        if (!com.guardianlink.policy.PolicyStore(this).load().locationEnabled) { toggle.isChecked = false; showStatus("Your parent has not enabled location sharing for this child device."); return }
+        if (!setupPrefs.getBoolean("permissions_unlocked", false)) { toggle.isChecked = false; showStatus("Turn on Protection monitoring from Home before enabling location sharing."); return }
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            toggle.isChecked = false
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 15)
+            showStatus("Allow location, then turn this toggle on again to start visible sharing.")
+            return
+        }
+        setupPrefs.edit().putBoolean(CHILD_LOCATION_ENABLED, true).apply()
         startForegroundService(Intent(this, LocationService::class.java))
-        showStatus("Visible location sharing started if the parent policy permits it.")
+        showStatus("Visible location sharing is on. Android shows a persistent notification while it runs.")
     }
 
     private fun sendSos() {
@@ -187,6 +259,10 @@ class ChildModeActivity : android.app.Activity() {
     private fun requestMoreTime() {
         val session = DeviceSessionStore(this)
         if (!session.isPaired()) { showStatus("Pair this child phone before requesting extra time."); return }
+        if (com.guardianlink.policy.PolicyStore(this).load().dailyScreenLimitMinutes <= 0) {
+            showStatus("Your parent has not set a daily screen-time limit, so extra time is not needed.")
+            return
+        }
         val options = intArrayOf(15, 30, 45, 60)
         android.app.AlertDialog.Builder(this).setTitle("Ask for extra time").setMessage("Choose the extra screen time you need today. Your parent decides whether to grant it.")
             .setItems(options.map { "$it minutes" }.toTypedArray()) { _, which ->
@@ -236,4 +312,5 @@ class ChildModeActivity : android.app.Activity() {
     private fun label(target: ChildSection) = target.name.lowercase().replaceFirstChar { it.uppercase() }
     private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
     private fun dp(value: Int) = NoirUi.dp(this, value)
+    private companion object { const val CHILD_LOCATION_ENABLED = "child_location_enabled" }
 }

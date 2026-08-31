@@ -11,13 +11,23 @@ class DeviceSessionStore(context: Context) {
     val accessToken: String? get() = secure.get("access_token")
     val refreshToken: String? get() = secure.get("refresh_token")
     val lastHandledCommandId: String? get() = prefs.getString("last_handled_command_id", null)
+    private val handledCommandIds: Set<String>
+        get() = prefs.getStringSet("handled_command_ids", emptySet()) ?: emptySet()
     fun save(deviceId: String, accessToken: String, refreshToken: String? = null) {
         prefs.edit().putString("device_id", deviceId).apply()
         secure.put("access_token", accessToken)
         secure.put("refresh_token", refreshToken)
     }
     fun clear() = prefs.edit().clear().apply()
-    fun markHandled(commandId: String) = prefs.edit().putString("last_handled_command_id", commandId).apply()
+    /**
+     * Commands are applied locally before their cloud receipt is written. Keeping a small
+     * local receipt journal makes a retry safe if the network fails between those steps.
+     */
+    fun hasHandled(commandId: String): Boolean = commandId == lastHandledCommandId || commandId in handledCommandIds
+    fun markHandled(commandId: String) {
+        val recent = (handledCommandIds + commandId).toList().takeLast(100).toSet()
+        prefs.edit().putString("last_handled_command_id", commandId).putStringSet("handled_command_ids", recent).apply()
+    }
     fun isPaired(): Boolean = !deviceId.isNullOrBlank() && !accessToken.isNullOrBlank()
     fun ensureFresh(): Boolean {
         val token = accessToken ?: return false

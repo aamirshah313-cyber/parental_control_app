@@ -8,11 +8,14 @@ create table if not exists public.family_chat_messages (
   sender_role text not null check (sender_role in ('parent', 'child')),
   body text not null default '' check (char_length(body) <= 600),
   audio_path text check (char_length(audio_path) between 1 and 300),
+  message_kind text not null default 'chat' check (message_kind in ('chat', 'quick_update')),
+  template_key text,
   created_at timestamptz not null default now(),
   check (char_length(body) > 0 or audio_path is not null),
   check (audio_path is null or audio_path like device_id::text || '/%')
 );
 create index if not exists family_chat_messages_device_created_idx on public.family_chat_messages (device_id, created_at desc);
+create index if not exists family_chat_messages_device_kind_created_idx on public.family_chat_messages (device_id, message_kind, created_at desc);
 alter table public.family_chat_messages enable row level security;
 revoke all on public.family_chat_messages from anon;
 grant select, insert on public.family_chat_messages to authenticated;

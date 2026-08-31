@@ -17,6 +17,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Spinner
+import android.widget.Switch
 import android.widget.TextView
 import com.guardianlink.model.ChildPolicy
 import com.guardianlink.model.ScheduleRule
@@ -38,6 +39,7 @@ class ParentModeActivity : android.app.Activity() {
     private lateinit var content: LinearLayout
     private lateinit var status: TextView
     private val sessionStore by lazy { ParentSessionStore(this) }
+    private val alertPrefs by lazy { getSharedPreferences("guardian_parent_alerts", MODE_PRIVATE) }
     private var session: ParentSession? = null
     private var family: FamilyRecord? = null
     private var selectedDevice: DeviceRecord? = null
@@ -164,8 +166,12 @@ class ParentModeActivity : android.app.Activity() {
     private fun showAlertControls() {
         val dialogContent = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0) }
         dialogContent.addView(note("Keep parent alerts enabled to hear SOS alerts and app-approval requests. Android may ask for notification permission."))
-        dialogContent.addView(button("Enable parent alerts") { enableParentAlerts() })
-        dialogContent.addView(secondaryButton("Stop current SOS alarm") { SosAlertService.stopAlarm(this); setStatus("SOS alarm stopped.") })
+        dialogContent.addView(Switch(this).apply {
+            text = "Parent alert monitoring"; textSize = 16f; setTextColor(NoirUi.TEXT)
+            isChecked = alertPrefs.getBoolean("monitoring_enabled", true)
+            setOnCheckedChangeListener { _, enabled -> setParentAlertsEnabled(enabled) }
+        })
+        dialogContent.addView(secondaryButton("Stop current SOS sound") { SosAlertService.stopAlarm(this); setStatus("SOS sound stopped. Alert monitoring remains active.") })
         android.app.AlertDialog.Builder(this)
             .setTitle("Parent alerts")
             .setView(dialogContent)
@@ -200,7 +206,7 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun compactAction(label: String, action: () -> Unit) = Button(this).apply {
-        text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = rounded(NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED); setOnClickListener { action() }
+        text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = NoirUi.interactiveBackground(this@ParentModeActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE, NoirUi.SURFACE_RAISED, 14); setOnClickListener { action() }
     }
 
     /** Three direct entry cards retain the reference layout while routing to real app actions. */
@@ -209,7 +215,7 @@ class ParentModeActivity : android.app.Activity() {
         controls.forEachIndexed { index, control ->
             addView(Button(this@ParentModeActivity).apply {
                 text = control.first; textSize = 13f; isAllCaps = false; gravity = Gravity.CENTER; setTextColor(NoirUi.TEXT)
-                background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED); minHeight = dp(96); setOnClickListener { control.second() }
+                background = NoirUi.interactiveBackground(this@ParentModeActivity, NoirUi.SURFACE, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 16); minHeight = dp(96); setOnClickListener { control.second() }
             }, LinearLayout.LayoutParams(0, dp(96), 1f).apply { setMargins(if (index == 0) 0 else dp(4), 0, if (index == controls.lastIndex) 0 else dp(4), 0) })
         }
     }
@@ -228,8 +234,10 @@ class ParentModeActivity : android.app.Activity() {
             addStatus()
             return
         }
-        // Start while this activity is visible; Android permits the foreground receiver to continue afterward.
-        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
+        // Preserve the user-controlled alert state: only an enabled toggle may start monitoring.
+        if (alertPrefs.getBoolean("monitoring_enabled", true)) {
+            runCatching { startForegroundService(android.content.Intent(this, SosAlertService::class.java)) }
+        }
         content.addView(summaryCard(activeFamily.name, devices.size))
         content.addView(actionRow(
             sectionLabel(DashboardSection.OVERVIEW) to { switchSection(DashboardSection.OVERVIEW, devices) },
@@ -276,7 +284,7 @@ class ParentModeActivity : android.app.Activity() {
             val health = note("Loading device health…")
             content.addView(health); loadDeviceHealth(device, health, dial)
             content.addView(controlRow(
-                "Instant\nLock" to { sendCommand("pause", null, "all_child_apps") },
+                "Pause\ncontrols" to { switchSection(DashboardSection.CONTROLS, devices) },
                 "Safe\nplaces" to { switchSection(DashboardSection.SAFETY, devices) },
                 "Bedtime\nMode" to { switchSection(DashboardSection.CONTROLS, devices) }
             ))
@@ -296,6 +304,7 @@ class ParentModeActivity : android.app.Activity() {
                 "Quick updates" to { family?.let { startActivity(QuickMessagesActivity.parentIntent(this, it.id, device.id, device.displayName)) } },
                 "Family chat" to { family?.let { startActivity(FamilyChatActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
             ))
+            content.addView(secondaryButton("Notifications") { family?.let { startActivity(NotificationsActivity.parentIntent(this, it.id, device.id, device.displayName)) } })
         }
         content.addView(section("Help & guide"))
         content.addView(actionRow(
@@ -342,12 +351,13 @@ class ParentModeActivity : android.app.Activity() {
             }
         ))
         content.addView(section("Location & emergency"))
-        val location = CheckBox(this).apply { text = "Enable visible child location sharing"; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.locationEnabled }
+        val location = Switch(this).apply { text = "Enable visible child location sharing"; textSize = 16f; setTextColor(NoirUi.TEXT); isChecked = selectedPolicy.locationEnabled }
         val interval = field("Location interval in minutes (5–120)", InputType.TYPE_CLASS_NUMBER).apply { setText(selectedPolicy.locationIntervalMinutes.toString()) }
         content.addView(location); content.addView(interval)
-        content.addView(button("Save parent location consent") {
-            publishPolicy(selectedPolicy.copy(locationEnabled = location.isChecked, locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15))
-        })
+        location.setOnCheckedChangeListener { _, enabled ->
+            publishPolicy(selectedPolicy.copy(locationEnabled = enabled, locationIntervalMinutes = interval.text.toString().toIntOrNull()?.coerceIn(5, 120) ?: 15))
+        }
+        content.addView(note("The toggle sends parent consent immediately. Edit the interval, then toggle location off and on to apply the new interval."))
         content.addView(actionRow(
             "Open live map" to { startActivity(LiveLocationActivity.intent(this, device.id, device.displayName)) },
             "Location log" to { startActivity(LocationLogActivity.intent(this, device.id, device.displayName)) }
@@ -381,15 +391,35 @@ class ParentModeActivity : android.app.Activity() {
 
     private fun buildDeviceControls(device: DeviceRecord) {
         content.addView(section("${device.displayName} controls"))
-        content.addView(note("Choose a quick action, then adjust longer-term rules below. Commands are applied when the child device next syncs."))
-        content.addView(actionRow(
-            "Pause managed" to { sendCommand("pause", null) },
-            "Pause all" to { sendCommand("pause", null, "all_child_apps") }
-        ))
-        content.addView(actionRow(
-            "Pause managed 30 min" to { sendCommand("pause", System.currentTimeMillis() + 30 * 60_000) },
-            "Resume access" to { sendCommand("resume", null) }
-        ))
+        content.addView(note("Use one toggle for the child’s pause state. The scope and duration choices are applied when the toggle is turned on; turning it off sends Resume access."))
+        val pauseScope = Spinner(this).apply {
+            adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, listOf("All child apps", "Managed apps only"))
+        }
+        val pauseDuration = Spinner(this).apply {
+            adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Until turned off", "30 minutes"))
+        }
+        val pauseToggle = Switch(this).apply { text = "Pause child access"; textSize = 16f; setTextColor(NoirUi.TEXT) }
+        content.addView(pauseScope); content.addView(pauseDuration); content.addView(pauseToggle)
+        var loadingPause = true
+        pauseToggle.setOnCheckedChangeListener { _, enabled ->
+            if (loadingPause) return@setOnCheckedChangeListener
+            pauseScope.isEnabled = !enabled
+            pauseDuration.isEnabled = !enabled
+            val scope = if (pauseScope.selectedItemPosition == 0) "all_child_apps" else "managed_apps"
+            val expiry = if (pauseDuration.selectedItemPosition == 1 && enabled) System.currentTimeMillis() + 30 * 60_000 else null
+            sendCommand(if (enabled) "pause" else "resume", expiry, scope)
+        }
+        Thread {
+            val state = ParentApi(usableParentSession(session ?: return@Thread)).pauseState(device.id)
+            runOnUiThread {
+                pauseScope.setSelection(if (state.scope == "all_child_apps") 0 else 1)
+                pauseDuration.setSelection(if (state.expiresAtEpochMs != null) 1 else 0)
+                pauseToggle.isChecked = state.active
+                pauseScope.isEnabled = !state.active
+                pauseDuration.isEnabled = !state.active
+                loadingPause = false
+            }
+        }.start()
         content.addView(actionRow(
             "Time requests" to { startActivity(TimeRequestsActivity.intent(this, device.id)) },
             "Check delivery" to { checkCommandDelivery() }
@@ -431,7 +461,7 @@ class ParentModeActivity : android.app.Activity() {
             val api = ParentApi(usableParentSession(current))
             val loadedFamily = api.families().firstOrNull()
             val devices = if (loadedFamily == null) emptyList() else api.devices(loadedFamily.id)
-            // Keep the current selection when possible; otherwise open the first child so the dashboard shows one latest position, not a history feed.
+            // Rows are paired and ordered by check-in, so the default is the most recently live child channel.
             val deviceToShow = devices.firstOrNull { it.id == selectedDevice?.id } ?: devices.firstOrNull()
             val remotePolicy = deviceToShow?.let { api.activePolicy(it.id) }
             runOnUiThread {
@@ -455,12 +485,18 @@ class ParentModeActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun enableParentAlerts() {
-        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 21)
+    private fun setParentAlertsEnabled(enabled: Boolean) {
+        alertPrefs.edit().putBoolean("monitoring_enabled", enabled).apply()
+        if (enabled) {
+            if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 21)
+            }
+            startForegroundService(android.content.Intent(this, SosAlertService::class.java))
+            setStatus("Parent alert monitoring is on. SOS and approval requests are checked every 5 seconds.")
+        } else {
+            SosAlertService.stopMonitoring(this)
+            setStatus("Parent alert monitoring is off. Turn the toggle back on to receive SOS and approval alerts.")
         }
-        startForegroundService(android.content.Intent(this, SosAlertService::class.java))
-        setStatus("Parent alerts enabled. SOS and new-app approval requests are checked every 5 seconds while the receiver remains active.")
     }
 
     private fun createPairing(childName: String, validity: Int, output: TextView, copyButton: Button) {
@@ -515,7 +551,9 @@ class ParentModeActivity : android.app.Activity() {
                 val lastSeen = device.lastSeenAt?.replace('T', ' ')?.substringBefore('.') ?: "not reported yet"
                 setStatus(
                     latest?.let { command ->
-                        val acknowledged = command.acknowledgement?.let { state -> "$state at ${command.acknowledgedAt?.replace('T', ' ')?.substringBefore('.')}" } ?: "waiting for the child device to sync"
+                        val acknowledged = command.appliedStatus?.let { state -> "$state at ${command.appliedAt?.replace('T', ' ')?.substringBefore('.')}" }
+                            ?: command.acknowledgement?.let { state -> "$state at ${command.acknowledgedAt?.replace('T', ' ')?.substringBefore('.')}" }
+                            ?: "waiting for the child device to sync"
                         "Child last seen: $lastSeen\nLatest ${command.commandType} command: $acknowledged."
                     } ?: "Child last seen: $lastSeen\nNo remote command has been sent yet."
                 )
@@ -559,7 +597,8 @@ class ParentModeActivity : android.app.Activity() {
                     val battery = it.batteryPercent?.let { value -> "$value% battery" } ?: "battery unavailable"
                     val protection = if (it.protectionActive) "protection enabled" else "protection setup incomplete"
                     val access = if (it.usageAccessAvailable) "Usage Access ready" else "Usage Access needs attention"
-                    "$battery • $protection\n$access • ${it.screenMinutesToday} minutes used today\nReported ${it.reportedAt.replace('T', ' ').substringBefore('.')}"
+                    val policy = it.appliedPolicyVersion?.let { version -> " • rules v$version applied" } ?: ""
+                    "$battery • $protection\n$access • ${it.screenMinutesToday} minutes used today$policy\nReported ${it.reportedAt.replace('T', ' ').substringBefore('.')}"
                 } ?: "No health check-in yet. Open the child app and sync once after completing protection setup."
             }
         }.start()
@@ -650,11 +689,11 @@ class ParentModeActivity : android.app.Activity() {
         background = rounded(NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED); layoutParams = layoutParams(0, 8)
     }
     private fun button(text: String, action: () -> Unit) = Button(this).apply {
-        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD)
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); background = NoirUi.interactiveBackground(this@ParentModeActivity, NoirUi.GOLD, NoirUi.GOLD_DIM, NoirUi.GOLD_DIM, 16)
         minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
     }
     private fun secondaryButton(text: String, action: () -> Unit) = Button(this).apply {
-        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = rounded(NoirUi.SURFACE, NoirUi.SURFACE_RAISED)
+        this.text = text; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = NoirUi.interactiveBackground(this@ParentModeActivity, NoirUi.SURFACE, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 16)
         minHeight = dp(48); layoutParams = layoutParams(0, 8); setOnClickListener { action() }
     }
     private fun addStatus() {

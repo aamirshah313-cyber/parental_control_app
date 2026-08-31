@@ -30,9 +30,15 @@ Scope: the Android parent and child clients, their Supabase REST flows, policies
 
 ## Required deployment state
 
-Run the existing migrations in order and then run `20260829_sync_integrity.sql` in Supabase SQL Editor. In particular, missing `20260828_reported_apps.sql` is the usual reason the parent receives no installed-app rows. The parent/child APK must be updated on both phones; the child needs to tap **Refresh installed apps for parent** once after updating.
+Run the existing migrations in order and then run `20260829_sync_integrity.sql` and `20260829_command_delivery_queue.sql` in Supabase SQL Editor. In particular, missing `20260828_reported_apps.sql` is the usual reason the parent receives no installed-app rows. The parent/child APK must be updated on both phones; the child needs to tap **Refresh installed apps for parent** once after updating. The command-delivery migration changes command handling from “latest only” to an ordered, visible queue.
 
-For typed Family Chat and private voice notes, additionally run `20260829_family_chat_voice.sql`. The parent/child conversation is independent of the existing preset-only Quick Messages feature.
+For typed Family Chat and private voice notes, additionally run `20260829_family_chat_voice.sql`.
+
+Current builds also require `20260829_unified_family_communication.sql`. Quick Updates are now labelled preset messages in the same protected conversation stream as Family Chat, so a preset sent from either phone is visible in Family Chat on both phones.
+
+`20260830_family_notifications.sql` adds a recipient-specific in-app inbox. A chat or preset sent by the parent is recorded for the child, and vice versa. The inbox remains available even when Android push notifications are disabled; both phones can use its manual Refresh control to confirm a just-sent update.
+
+The parent inbox intentionally reads every child stream in the family, not merely the currently selected dashboard profile. A child update therefore remains visible to the one parent account and opens the exact child thread when tapped.
 
 ## Security controls confirmed
 

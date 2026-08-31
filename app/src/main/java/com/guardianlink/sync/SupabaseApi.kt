@@ -11,7 +11,8 @@ import java.util.UUID
 data class RemoteCommand(val id: String, val type: String, val scope: String, val expiresAtEpochMs: Long?, val payload: JSONObject = JSONObject())
 data class ReportedAppPayload(val packageName: String, val displayName: String, val pendingApproval: Boolean? = null)
 data class ChildQuickMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
-data class ChildFamilyChatMessage(val id: String, val senderRole: String, val body: String, val audioPath: String?, val createdAt: String)
+data class ChildFamilyChatMessage(val id: String, val senderRole: String, val body: String, val audioPath: String?, val createdAt: String, val messageKind: String = "chat", val templateKey: String? = null)
+data class FamilyNotification(val id: String, val deviceId: String, val title: String, val body: String, val eventType: String, val createdAt: String, val readAt: String? = null)
 
 /** Small dependency-free REST client. The app uses its public anon key plus the child device JWT. */
 class SupabaseApi(private val deviceId: String, private val accessToken: String) {
@@ -27,19 +28,36 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
     fun fetchLatestCommand(): RemoteCommand? {
         if (!enabled) return null
         val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&order=created_at.desc&limit=1&select=id,command_type,scope,expires_at,payload") ?: return null
-        if (records.length() == 0) return null
-        val command = records.getJSONObject(0)
-        val expiry = command.optString("expires_at").takeIf { it.isNotBlank() }?.let { java.time.Instant.parse(it).toEpochMilli() }
-        return RemoteCommand(command.getString("id"), command.getString("command_type"), command.optString("scope", "managed_apps"), expiry, command.optJSONObject("payload") ?: JSONObject())
+        return records.takeIf { it.length() > 0 }?.let { commandRecord(it.getJSONObject(0)) }
     }
 
-    fun acknowledge(commandId: String, status: String) {
-        if (!enabled) return
-        post("/rest/v1/device_acknowledgements", JSONObject().apply {
+    /**
+     * Reads every command that the child has not yet completed, oldest first. The fallback
+     * keeps existing installations functional until the queue migration is run.
+     */
+    fun fetchPendingCommands(): List<RemoteCommand> {
+        if (!enabled) return emptyList()
+        val records = get("/rest/v1/parent_commands?device_id=eq.$deviceId&child_processed_at=is.null&order=created_at.asc&limit=50&select=id,command_type,scope,expires_at,payload")
+        return if (records == null) listOfNotNull(fetchLatestCommand())
+        else (0 until records.length()).map { commandRecord(records.getJSONObject(it)) }
+    }
+
+    fun acknowledge(commandId: String, status: String): Boolean {
+        if (!enabled) return false
+        return post("/rest/v1/device_acknowledgements", JSONObject().apply {
             put("command_id", commandId)
             put("device_id", deviceId)
             put("status", status)
         })
+    }
+
+    /** The server-side receipt makes command delivery visible to the parent and enables a real queue. */
+    fun markCommandProcessed(commandId: String, status: String): Boolean {
+        if (!enabled) return false
+        return request("POST", "/rest/v1/rpc/complete_child_command", JSONObject().apply {
+            put("p_command_id", commandId)
+            put("p_status", status)
+        }.toString()) != null
     }
 
     /** Confirms that this child JWT can still see its own paired device before a sync is called successful. */
@@ -100,19 +118,45 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
 
     fun chatMessages(): List<ChildFamilyChatMessage> {
         if (!enabled) return emptyList()
-        val rows = get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&select=id,sender_role,body,audio_path,created_at&order=created_at.desc&limit=80") ?: return emptyList()
+        val rows = chatRows() ?: return emptyList()
         return (0 until rows.length()).map { index ->
-            rows.getJSONObject(index).let { ChildFamilyChatMessage(it.getString("id"), it.getString("sender_role"), it.optString("body"), it.optString("audio_path").ifBlank { null }, it.getString("created_at")) }
+            childChatRecord(rows.getJSONObject(index))
         }.reversed()
     }
 
-    fun sendChatMessage(body: String, audioPath: String? = null): Boolean {
+    fun latestChatMessage(senderRole: String): ChildFamilyChatMessage? {
+        if (!enabled) return null
+        val rows = get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&sender_role=eq.$senderRole&select=id,sender_role,body,audio_path,created_at,message_kind,template_key&order=created_at.desc&limit=1")
+            ?: get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&sender_role=eq.$senderRole&select=id,sender_role,body,audio_path,created_at&order=created_at.desc&limit=1")
+            ?: return null
+        return rows.takeIf { it.length() > 0 }?.let { childChatRecord(it.getJSONObject(0)) }
+    }
+
+    fun sendChatMessage(body: String, audioPath: String? = null, messageKind: String = "chat", templateKey: String? = null): Boolean {
         if (!enabled || body.length > 600) return false
         val familyRows = get("/rest/v1/devices?id=eq.$deviceId&select=family_id") ?: return false
         if (familyRows.length() == 0) return false
-        return request("POST", "/rest/v1/family_chat_messages", JSONObject().apply {
-            put("family_id", familyRows.getJSONObject(0).getString("family_id")); put("device_id", deviceId); put("sender_role", "child"); put("body", body); audioPath?.let { put("audio_path", it) }
+        val familyId = familyRows.getJSONObject(0).getString("family_id")
+        val sent = request("POST", "/rest/v1/family_chat_messages", JSONObject().apply {
+            put("family_id", familyId); put("device_id", deviceId); put("sender_role", "child"); put("body", body); audioPath?.let { put("audio_path", it) }
+            if (messageKind != "chat") put("message_kind", messageKind)
+            templateKey?.let { put("template_key", it) }
         }.toString()) != null
+        if (sent) postNotification(familyId, "parent", if (messageKind == "quick_update") "Quick update from child" else "New message from child", body.ifBlank { "New voice note" }, messageKind)
+        return sent
+    }
+
+    fun notifications(): List<FamilyNotification> {
+        if (!enabled) return emptyList()
+        val rows = get("/rest/v1/family_notifications?device_id=eq.$deviceId&target_role=eq.child&select=id,device_id,title,body,event_type,created_at,read_at&order=created_at.desc&limit=50") ?: return emptyList()
+        return (0 until rows.length()).map { notificationRecord(rows.getJSONObject(it)) }
+    }
+
+    fun latestNotification(): FamilyNotification? = notifications().firstOrNull()
+
+    fun markNotificationsRead(ids: Collection<String>): Boolean {
+        if (!enabled || ids.isEmpty()) return true
+        return patch("/rest/v1/family_notifications?target_role=eq.child&id=in.(${ids.joinToString(",")})", JSONObject().put("read_at", java.time.Instant.now().toString()))
     }
 
     fun uploadVoice(file: File): String? {
@@ -131,13 +175,20 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         }.toString()) != null
     }
 
-    fun reportHealth(batteryPercent: Int?, protectionActive: Boolean, usageAccessAvailable: Boolean, screenMinutesToday: Int) {
+    fun reportHealth(batteryPercent: Int?, protectionActive: Boolean, usageAccessAvailable: Boolean, screenMinutesToday: Int, appliedPolicyVersion: Int) {
         if (!enabled) return
-        request("POST", "/rest/v1/device_health?on_conflict=device_id", JSONObject().apply {
+        val health = JSONObject().apply {
             put("device_id", deviceId); batteryPercent?.let { put("battery_percent", it.coerceIn(0, 100)) }
             put("protection_active", protectionActive); put("usage_access_available", usageAccessAvailable)
             put("screen_minutes_today", screenMinutesToday.coerceAtLeast(0)); put("reported_at", java.time.Instant.now().toString())
-        }.toString(), "resolution=merge-duplicates,return=minimal")
+            put("applied_policy_version", appliedPolicyVersion.coerceAtLeast(0))
+        }
+        // Older database deployments do not have the delivery column yet. Report basic health
+        // rather than making a sync look failed while the administrator applies the migration.
+        if (request("POST", "/rest/v1/device_health?on_conflict=device_id", health.toString(), "resolution=merge-duplicates,return=minimal") == null) {
+            health.remove("applied_policy_version")
+            request("POST", "/rest/v1/device_health?on_conflict=device_id", health.toString(), "resolution=merge-duplicates,return=minimal")
+        }
     }
 
     fun upsertReportedApps(apps: List<ReportedAppPayload>): Boolean {
@@ -159,8 +210,21 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
             .all { packageName -> delete("/rest/v1/device_apps?device_id=eq.$deviceId&package_name=eq.$packageName") }
     }
 
+    private fun commandRecord(command: JSONObject): RemoteCommand {
+        val expiry = command.optString("expires_at").takeIf { it.isNotBlank() }?.let { java.time.Instant.parse(it).toEpochMilli() }
+        return RemoteCommand(command.getString("id"), command.getString("command_type"), command.optString("scope", "managed_apps"), expiry, command.optJSONObject("payload") ?: JSONObject())
+    }
+
+    private fun chatRows(): JSONArray? = get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&select=id,sender_role,body,audio_path,created_at,message_kind,template_key&order=created_at.desc&limit=80")
+        ?: get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&select=id,sender_role,body,audio_path,created_at&order=created_at.desc&limit=80")
+    private fun childChatRecord(row: JSONObject) = ChildFamilyChatMessage(row.getString("id"), row.getString("sender_role"), row.optString("body"), row.optString("audio_path").ifBlank { null }, row.getString("created_at"), row.optString("message_kind", "chat"), row.optString("template_key").ifBlank { null })
+    private fun notificationRecord(row: JSONObject) = FamilyNotification(row.getString("id"), row.getString("device_id"), row.getString("title"), row.getString("body"), row.getString("event_type"), row.getString("created_at"), row.optString("read_at").ifBlank { null })
+    private fun postNotification(familyId: String, targetRole: String, title: String, body: String, eventType: String): Boolean = request("POST", "/rest/v1/family_notifications", JSONObject().apply {
+        put("family_id", familyId); put("device_id", deviceId); put("target_role", targetRole); put("title", title); put("body", body); put("event_type", eventType)
+    }.toString()) != null
+
     private fun get(path: String): JSONArray? = request("GET", path, null)?.let(::JSONArray)
-    private fun post(path: String, body: JSONObject) { request("POST", path, body.toString()) }
+    private fun post(path: String, body: JSONObject): Boolean = request("POST", path, body.toString()) != null
     private fun patch(path: String, body: JSONObject): Boolean = request("PATCH", path, body.toString()) != null
     private fun delete(path: String): Boolean = request("DELETE", path, null) != null
 

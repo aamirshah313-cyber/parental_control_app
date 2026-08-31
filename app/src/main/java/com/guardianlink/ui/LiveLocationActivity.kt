@@ -32,6 +32,7 @@ class LiveLocationActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
         val name = intent.getStringExtra(EXTRA_DEVICE_NAME) ?: "Child device"
         root.addView(TextView(this).apply { text = "LATEST SHARED POSITION"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD; letterSpacing = .12f; setTextColor(NoirUi.GOLD) })
@@ -74,7 +75,7 @@ class LiveLocationActivity : android.app.Activity() {
     }
 
     private fun button(label: String, action: () -> Unit) = Button(this).apply {
-        text = label; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); backgroundTintList = ColorStateList.valueOf(NoirUi.GOLD); minHeight = dp(48)
+        text = label; textSize = 15f; isAllCaps = false; setTextColor(NoirUi.BACKGROUND); background = NoirUi.interactiveBackground(this@LiveLocationActivity, NoirUi.GOLD, NoirUi.GOLD_DIM, NoirUi.GOLD_DIM, 16); minHeight = dp(48)
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(8), 0, 0) }
         setOnClickListener { action() }
     }

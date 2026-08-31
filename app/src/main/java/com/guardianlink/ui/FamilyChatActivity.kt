@@ -56,13 +56,19 @@ class FamilyChatActivity : android.app.Activity() {
         record = NoirUi.secondaryButton(this, "Record voice") { toggleRecording() }
         actions.addView(record, LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) })
         root.addView(actions)
+        root.addView(NoirUi.secondaryButton(this, "Refresh conversation") { loadMessages() }.apply { layoutParams = margins(8) })
         root.addView(NoirUi.secondaryButton(this, "Ask Guardian Guide") { startActivity(GuardianGuideActivity.intent(this, isParent)) }.apply { layoutParams = margins(8) })
         root.addView(TextView(this).apply { text = "Conversation"; textSize = 17f; setTextColor(NoirUi.TEXT); setPadding(0, dp(14), 0, dp(4)) })
         messages = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(messages)
     }
 
-    override fun onResume() { super.onResume(); handler.post(refresh) }
+    override fun onResume() {
+        super.onResume()
+        // A child opening chat confirms which paired device channel is currently live.
+        if (!isParent) Thread { DeviceSessionStore(this).api()?.touchLastSeen() }.start()
+        handler.post(refresh)
+    }
     override fun onPause() { handler.removeCallbacks(refresh); super.onPause() }
     override fun onDestroy() { stopRecorder(false); player?.release(); super.onDestroy() }
 
@@ -123,8 +129,9 @@ class FamilyChatActivity : android.app.Activity() {
     }
 
     private fun loadMessages() {
+        status.text = "Refreshing shared conversation…"
         Thread {
-            val result = if (isParent) parentApi()?.let { api -> intent.getStringExtra(EXTRA_DEVICE_ID)?.let(api::chatMessages) } else DeviceSessionStore(this).api()?.chatMessages()?.map { FamilyChatMessage(it.id, it.senderRole, it.body, it.audioPath, it.createdAt) }
+            val result = if (isParent) parentApi()?.let { api -> intent.getStringExtra(EXTRA_DEVICE_ID)?.let(api::chatMessages) } else DeviceSessionStore(this).api()?.chatMessages()?.map { FamilyChatMessage(it.id, it.senderRole, it.body, it.audioPath, it.createdAt, it.messageKind, it.templateKey) }
             runOnUiThread { render(result) }
         }.start()
     }
@@ -147,6 +154,7 @@ class FamilyChatActivity : android.app.Activity() {
         setPadding(dp(13), dp(10), dp(13), dp(10)); background = NoirUi.rounded(this@FamilyChatActivity, if (mine) NoirUi.SURFACE_RAISED else NoirUi.SURFACE, if (mine) NoirUi.GOLD_DIM else NoirUi.SURFACE_RAISED, 16)
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(if (mine) dp(34) else 0, dp(6), if (mine) 0 else dp(34), 0) }
         addView(TextView(this@FamilyChatActivity).apply { text = if (message.senderRole == "parent") "Parent" else "Child"; textSize = 12f; setTextColor(NoirUi.GOLD) })
+        if (message.messageKind == "quick_update") addView(TextView(this@FamilyChatActivity).apply { text = "QUICK UPDATE"; textSize = 10f; letterSpacing = .08f; setTextColor(NoirUi.MUTED); setPadding(0, dp(2), 0, 0) })
         if (message.body.isNotBlank()) addView(TextView(this@FamilyChatActivity).apply { text = message.body; textSize = 15f; setTextColor(NoirUi.TEXT); setPadding(0, dp(3), 0, dp(3)) })
         message.audioPath?.let { path -> addView(NoirUi.secondaryButton(this@FamilyChatActivity, "▶ Play voice note") { playVoice(path) }.apply { minHeight = dp(40) }) }
         addView(TextView(this@FamilyChatActivity).apply { text = message.createdAt.replace('T', ' ').substringBefore('.'); textSize = 11f; setTextColor(NoirUi.MUTED); setPadding(0, dp(4), 0, 0) })
@@ -170,7 +178,7 @@ class FamilyChatActivity : android.app.Activity() {
         }.start()
     }
 
-    private fun parentApi(): ParentApi? = ParentSessionStore(this).ensureFresh()?.let(::ParentApi)
+    private fun parentApi(): ParentApi? = (ParentSessionStore(this).ensureFresh() ?: ParentSessionStore(this).load())?.let(::ParentApi)
     private fun margins(top: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, 0) }
     private fun dp(value: Int) = NoirUi.dp(this, value)
 

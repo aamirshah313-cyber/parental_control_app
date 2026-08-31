@@ -27,6 +27,7 @@ class ManageAppsActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoirUi.apply(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)); setBackgroundColor(NoirUi.BACKGROUND) }
         setContentView(ScrollView(this).apply { setBackgroundColor(NoirUi.BACKGROUND); addView(content) })
         content.addView(TextView(this).apply { text = "APP CONTROLS"; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NoirUi.GOLD) })
@@ -128,7 +129,7 @@ class ManageAppsActivity : android.app.Activity() {
         addView(compactButton(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) })
         addView(compactButton(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) })
     }
-    private fun compactButton(label: String, action: () -> Unit) = Button(this).apply { text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = android.graphics.drawable.GradientDrawable().apply { setColor(NoirUi.SURFACE_RAISED); cornerRadius = dp(14).toFloat(); setStroke(dp(1), NoirUi.SURFACE_RAISED) }; setOnClickListener { action() } }
+    private fun compactButton(label: String, action: () -> Unit) = Button(this).apply { text = label; textSize = 13f; isAllCaps = false; setTextColor(NoirUi.TEXT); background = NoirUi.interactiveBackground(this@ManageAppsActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE, NoirUi.SURFACE_RAISED, 14); setOnClickListener { action() } }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     companion object {

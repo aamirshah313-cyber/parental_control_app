@@ -21,7 +21,8 @@ class PairingClient {
             setRequestProperty("Content-Type", "application/json")
             outputStream.bufferedWriter().use { it.write(JSONObject().apply {
                 put("pair_code", pairCode.trim())
-                put("device_name", deviceName.trim())
+                // The parent chooses the dashboard name. Omitting this preserves it during claim.
+                deviceName.trim().takeIf { it.isNotBlank() }?.let { put("device_name", it) }
             }.toString()) }
             if (responseCode !in 200..299) error("Pairing code was rejected")
             inputStream.bufferedReader().use { it.readText() }

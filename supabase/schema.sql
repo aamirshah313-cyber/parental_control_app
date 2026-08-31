@@ -35,8 +35,11 @@ create table public.parent_commands (
   command_type text not null check (command_type in ('pause', 'resume', 'refresh_policy')),
   scope text not null default 'managed_apps',
   expires_at timestamptz,
+  child_processed_status text check (child_processed_status in ('received', 'applied', 'expired', 'failed')),
+  child_processed_at timestamptz,
   created_at timestamptz not null default now()
 );
+create index parent_commands_pending_delivery_idx on public.parent_commands (device_id, created_at asc) where child_processed_at is null;
 
 create table public.device_acknowledgements (
   id uuid primary key default gen_random_uuid(),
@@ -96,9 +99,22 @@ create policy "Child reads own commands" on public.parent_commands
   for select using (exists (select 1 from public.devices d where d.id = device_id and d.child_auth_user_id = auth.uid()));
 
 create policy "Child writes own acknowledgements" on public.device_acknowledgements
-  for insert with check (exists (select 1 from public.devices d where d.id = device_id and d.child_auth_user_id = auth.uid()));
+  for insert with check (exists (select 1 from public.devices d join public.parent_commands c on c.id = command_id where d.id = device_id and c.device_id = device_id and d.child_auth_user_id = auth.uid()));
 create policy "Parents read acknowledgements" on public.device_acknowledgements
   for select using (exists (select 1 from public.parent_commands c join public.devices d on d.id = c.device_id join public.families f on f.id = d.family_id where c.id = command_id and f.owner_id = auth.uid()));
+
+create function public.complete_child_command(p_command_id uuid, p_status text)
+returns boolean language plpgsql security definer set search_path = public as $$
+begin
+  if p_status not in ('received', 'applied', 'expired', 'failed') then raise exception 'invalid command status'; end if;
+  update public.parent_commands c set child_processed_at = now(), child_processed_status = p_status
+  where c.id = p_command_id and c.child_processed_at is null
+    and exists (select 1 from public.devices d where d.id = c.device_id and d.child_auth_user_id = auth.uid());
+  return found;
+end;
+$$;
+revoke all on function public.complete_child_command(uuid, text) from public;
+grant execute on function public.complete_child_command(uuid, text) to authenticated;
 
 create policy "Child writes minimal own events" on public.device_events
   for insert with check (exists (select 1 from public.devices d where d.id = device_id and d.child_auth_user_id = auth.uid()));

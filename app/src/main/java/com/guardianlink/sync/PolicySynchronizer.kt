@@ -10,9 +10,9 @@ import com.guardianlink.policy.PolicyStore
 import com.guardianlink.enforcement.UsageMonitor
 import android.app.AppOpsManager
 
-/** Downloads only the active policy and latest command. Local enforcement remains active if this fails. */
+/** Downloads the active policy and applies every queued command. Local enforcement remains active if this fails. */
 class PolicySynchronizer(private val context: Context) {
-    fun sync(): Boolean = runCatching {
+    fun sync(): Boolean = synchronized(syncLock) { runCatching {
         val session = DeviceSessionStore(context)
         if (!session.isPaired()) return true
         val api = session.api() ?: return false
@@ -23,26 +23,38 @@ class PolicySynchronizer(private val context: Context) {
             ?.let { it.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1).takeIf { value -> value >= 0 } }
         val appOps = context.getSystemService(AppOpsManager::class.java)
         val usageAllowed = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
-        api.reportHealth(battery, context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("permissions_unlocked", false), usageAllowed, if (usageAllowed) UsageMonitor(context).totalScreenMinutesToday() else 0)
         val store = PolicyStore(context)
         api.fetchActivePolicy()?.let { raw -> store.saveFromCloudJson(raw) }
         val updatedPolicy = store.load()
-        if (!updatedPolicy.locationEnabled) context.stopService(Intent(context, LocationService::class.java))
+        api.reportHealth(battery, context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("permissions_unlocked", false), usageAllowed, if (usageAllowed) UsageMonitor(context).totalScreenMinutesToday() else 0, updatedPolicy.version)
+        val childLocationEnabled = context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("child_location_enabled", false)
+        if (!updatedPolicy.locationEnabled || !childLocationEnabled) context.stopService(Intent(context, LocationService::class.java))
         else if (context.getSharedPreferences("guardian_child_setup", Context.MODE_PRIVATE).getBoolean("permissions_unlocked", false) &&
             (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED || context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED)) {
             // Once the child has completed step 5 and explicitly granted location, future parent enable/disable changes can work remotely.
             runCatching { context.startForegroundService(Intent(context, LocationService::class.java)) }
         }
-        api.fetchLatestCommand()?.takeIf { it.id != session.lastHandledCommandId }?.let { command ->
-            when {
-                command.expiresAtEpochMs != null && command.expiresAtEpochMs < System.currentTimeMillis() -> api.acknowledge(command.id, "expired")
-                command.type == "pause" -> { store.setPause(command.expiresAtEpochMs, command.scope == "all_child_apps"); api.acknowledge(command.id, "applied") }
-                command.type == "resume" -> { store.resume(); api.acknowledge(command.id, "applied") }
-                command.type == "grant_time" -> { store.addDailyBonusMinutes(command.payload.optInt("minutes", 0)); api.acknowledge(command.id, "applied") }
-                else -> api.acknowledge(command.id, "received")
+        api.fetchPendingCommands().forEach { command ->
+            val status = if (session.hasHandled(command.id)) "applied" else when {
+                command.expiresAtEpochMs != null && command.expiresAtEpochMs < System.currentTimeMillis() -> "expired"
+                command.type == "pause" -> { store.setPause(command.expiresAtEpochMs, command.scope == "all_child_apps"); "applied" }
+                command.type == "resume" -> { store.resume(); "applied" }
+                command.type == "grant_time" -> {
+                    // A bonus extends an existing daily limit; it must never create one by itself.
+                    if (store.load().dailyScreenLimitMinutes > 0) store.addDailyBonusMinutes(command.payload.optInt("minutes", 0))
+                    "applied"
+                }
+                command.type == "refresh_policy" -> "applied"
+                else -> "received"
             }
-            session.markHandled(command.id)
+            // Persist before sending receipts: a retry can then complete the receipt without
+            // applying a grant or pause twice after an intermittent network failure.
+            if (!session.hasHandled(command.id)) session.markHandled(command.id)
+            api.acknowledge(command.id, status)
+            api.markCommandProcessed(command.id, status)
         }
         true
-    }.getOrDefault(false)
+    }.getOrDefault(false) }
+
+    private companion object { val syncLock = Any() }
 }

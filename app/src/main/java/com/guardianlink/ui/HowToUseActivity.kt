@@ -28,7 +28,7 @@ class HowToUseActivity : android.app.Activity() {
     private fun parentGuide(content: LinearLayout) {
         content.addView(guideCard("1", "Create your family", "Sign in, create one family, then choose Pair a child. A pairing code is single-use and expires after the time you choose."))
         content.addView(guideCard("2", "Choose a child device", "Each distinct child name appears once. Open a child card to see controls, the latest shared position, and its current protection rules."))
-        content.addView(guideCard("3", "Use quick controls", "Pause managed apps, pause all child apps, set a 30-minute pause, or resume access. Use Delivery status to confirm the child device synced."))
+        content.addView(guideCard("3", "Use pause controls", "Choose the pause scope and duration, then turn on Pause child access. Turn the same toggle off to resume. Use Delivery status to confirm the child device synced."))
         content.addView(guideCard("4", "Set lasting rules", "Manage reported apps, approve new installations, choose bedtime, add browser category filters and blocked keywords, and control whether visible location sharing is enabled."))
         content.addView(guideCard("5", "Stay coordinated", "Quick Messages provides preset pickup and safety updates. Latest shared position is on the dashboard; older check-ins are in Location log."))
         content.addView(guideCard("6", "Respond to alerts", "Keep parent alerts enabled for SOS and app-approval notices. An SOS requires you to contact the child and stop the alarm when handled."))

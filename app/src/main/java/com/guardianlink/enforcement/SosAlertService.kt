@@ -42,13 +42,18 @@ class SosAlertService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(1003, android.app.Notification.Builder(this, "sos_receiver")
+        startForeground(MONITOR_NOTIFICATION_ID, android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("${getString(R.string.app_name)} SOS receiver is active")
             .setContentText("SOS alarms and app approval requests are monitored")
             .setOngoing(true)
             .build())
         handler.post(poll)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP_AUDIBLE) stopAudibleAlert()
+        return START_STICKY
     }
 
     private fun pollForAlerts() {
@@ -72,11 +77,20 @@ class SosAlertService : Service() {
                 lastMessagePollAt = now
                 api.families().firstOrNull()?.let { family ->
                     api.devices(family.id).forEach { device ->
-                        api.latestQuickMessage(device.id, "child")?.let { message ->
-                            val key = "last_child_message_${device.id}"
-                            if (message.id != prefs.getString(key, null)) {
-                                prefs.edit().putString(key, message.id).apply()
-                                handler.post { showQuickMessage(family.id, device.id, device.displayName, message.body) }
+                        val notification = api.latestNotification(device.id)
+                        val message = api.latestChatMessage(device.id, "child")
+                        val messageId = notification?.id ?: message?.id ?: return@forEach
+                        val key = "last_child_message_${device.id}"
+                        if (messageId != prefs.getString(key, null)) {
+                            prefs.edit().putString(key, messageId).apply()
+                            handler.post {
+                                showFamilyMessage(
+                                    family.id,
+                                    device.id,
+                                    device.displayName,
+                                    notification?.body ?: message?.body?.ifBlank { "New voice note" } ?: "New message",
+                                    notification?.eventType ?: message?.messageKind ?: "chat"
+                                )
                             }
                         }
                     }
@@ -85,12 +99,14 @@ class SosAlertService : Service() {
         }.start()
     }
 
-    private fun showQuickMessage(familyId: String, deviceId: String, deviceName: String, body: String) {
+    private fun showFamilyMessage(familyId: String, deviceId: String, deviceName: String, body: String, messageKind: String) {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         // Build a real parent-hub -> conversation stack, so Back never drops a notification visitor at the launcher.
+        val destination = if (messageKind == "quick_update") QuickMessagesActivity.parentIntent(this, familyId, deviceId, deviceName)
+        else com.guardianlink.ui.FamilyChatActivity.parentIntent(this, familyId, deviceId, deviceName)
         val open = PendingIntent.getActivities(this, deviceId.hashCode(), arrayOf(
             Intent(this, ParentModeActivity::class.java),
-            QuickMessagesActivity.parentIntent(this, familyId, deviceId, deviceName)
+            destination
         ), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         getSystemService(NotificationManager::class.java).notify(2200 + (deviceId.hashCode() and 0x3ff), android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
@@ -116,8 +132,7 @@ class SosAlertService : Service() {
     }
 
     private fun playAlarm(message: String) {
-        ringtone?.stop()
-        toneGenerator?.release()
+        stopAudibleAlert(cancelNotification = false)
         toneGenerator = ToneGenerator(AudioManager.STREAM_ALARM, 100).also {
             it.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 15_000)
         }
@@ -140,7 +155,7 @@ class SosAlertService : Service() {
     private fun showSosNotification(message: String) {
         if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val open = PendingIntent.getActivity(this, 1003, SosAlertActivity.intent(this, message).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        getSystemService(NotificationManager::class.java).notify(1003, android.app.Notification.Builder(this, "sos_receiver")
+        getSystemService(NotificationManager::class.java).notify(SOS_NOTIFICATION_ID, android.app.Notification.Builder(this, "sos_receiver")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("SOS ALERT — child needs help")
             .setContentText(message)
@@ -158,13 +173,25 @@ class SosAlertService : Service() {
         )
     }
 
+    /** Stops the disruptive alarm only; the foreground receiver continues polling for the next SOS. */
+    private fun stopAudibleAlert(cancelNotification: Boolean = true) {
+        ringtone?.stop(); ringtone = null
+        toneGenerator?.release(); toneGenerator = null
+        voice?.stop()
+        if (cancelNotification) getSystemService(NotificationManager::class.java).cancel(SOS_NOTIFICATION_ID)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
-    override fun onDestroy() { handler.removeCallbacks(poll); ringtone?.stop(); toneGenerator?.release(); voice?.stop(); voice?.shutdown(); super.onDestroy() }
+    override fun onDestroy() { handler.removeCallbacks(poll); stopAudibleAlert(); voice?.shutdown(); super.onDestroy() }
 
     companion object {
         fun stopAlarm(context: Context) {
-            context.getSystemService(NotificationManager::class.java).cancel(1003)
-            context.stopService(Intent(context, SosAlertService::class.java))
+            context.startService(Intent(context, SosAlertService::class.java).setAction(ACTION_STOP_AUDIBLE))
         }
+        /** Disables the optional parent monitoring setting, not merely the current alarm sound. */
+        fun stopMonitoring(context: Context) { context.stopService(Intent(context, SosAlertService::class.java)) }
+        private const val ACTION_STOP_AUDIBLE = "com.guardianlink.action.STOP_SOS_AUDIBLE"
+        private const val MONITOR_NOTIFICATION_ID = 1002
+        private const val SOS_NOTIFICATION_ID = 1003
     }
 }

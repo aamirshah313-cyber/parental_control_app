@@ -37,7 +37,7 @@ class LocationService : Service(), LocationListener {
 
     private fun requestUpdates() {
         val policy = store.load()
-        if (!policy.locationEnabled) { stopSelf(); return }
+        if (!policy.locationEnabled || !getSharedPreferences("guardian_child_setup", MODE_PRIVATE).getBoolean("child_location_enabled", false)) { stopSelf(); return }
         val interval = policy.locationIntervalMinutes.coerceIn(5, 120) * 60_000L
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { provider ->
             runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false)
@@ -47,7 +47,7 @@ class LocationService : Service(), LocationListener {
     }
 
     override fun onLocationChanged(location: Location) {
-        if (!store.load().locationEnabled) { stopSelf(); return }
+        if (!store.load().locationEnabled || !getSharedPreferences("guardian_child_setup", MODE_PRIVATE).getBoolean("child_location_enabled", false)) { stopSelf(); return }
         upload(location)
     }
 

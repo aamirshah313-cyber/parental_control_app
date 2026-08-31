@@ -9,11 +9,11 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.guardianlink.sync.DeviceSessionStore
-import com.guardianlink.sync.FamilyMessage
+import com.guardianlink.sync.FamilyChatMessage
 import com.guardianlink.sync.ParentApi
 import com.guardianlink.sync.ParentSessionStore
 
-/** Preset updates are deliberately a latest-status channel; Family Chat keeps the full conversation. */
+/** Preset updates are a latest-status view of the same family conversation used by Family Chat. */
 class QuickMessagesActivity : android.app.Activity() {
     private lateinit var latest: LinearLayout
     private lateinit var state: TextView
@@ -73,10 +73,10 @@ class QuickMessagesActivity : android.app.Activity() {
                 val session = ParentSessionStore(this).ensureFresh() ?: ParentSessionStore(this).load()
                 val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
                 val familyId = intent.getStringExtra(EXTRA_FAMILY_ID)
-                session != null && deviceId != null && familyId != null && ParentApi(session).sendQuickMessage(familyId, deviceId, template.key, template.body)
-            } else DeviceSessionStore(this).api()?.sendQuickMessage(template.key, template.body) == true
+                session != null && deviceId != null && familyId != null && ParentApi(session).sendChatMessage(familyId, deviceId, template.body, messageKind = MESSAGE_KIND_QUICK, templateKey = template.key)
+            } else DeviceSessionStore(this).api()?.sendChatMessage(template.body, messageKind = MESSAGE_KIND_QUICK, templateKey = template.key) == true
             runOnUiThread {
-                state.text = if (sent) "Update sent. The other device will see it after refresh." else "Update could not be sent. Run the quick-messages migration and check the connection."
+                state.text = if (sent) "Update sent. It is also visible in Family Chat on both devices." else "Update could not be sent. Run the unified-communication migration and check the connection."
                 if (sent) loadMessages()
             }
         }.start()
@@ -84,29 +84,29 @@ class QuickMessagesActivity : android.app.Activity() {
 
     private fun loadMessages() {
         Thread {
-            val result: List<FamilyMessage>? = if (isParent) {
+            val result: List<FamilyChatMessage>? = if (isParent) {
                 val session = ParentSessionStore(this).ensureFresh() ?: ParentSessionStore(this).load()
                 val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
-                if (session == null || deviceId == null) null else ParentApi(session).quickMessages(deviceId)
-            } else DeviceSessionStore(this).api()?.quickMessages()?.map { FamilyMessage(it.id, it.senderRole, it.templateKey, it.body, it.createdAt) }
+                if (session == null || deviceId == null) null else ParentApi(session).chatMessages(deviceId)
+            } else DeviceSessionStore(this).api()?.chatMessages()?.map { FamilyChatMessage(it.id, it.senderRole, it.body, it.audioPath, it.createdAt, it.messageKind, it.templateKey) }
             runOnUiThread { render(result) }
         }.start()
     }
 
-    private fun render(items: List<FamilyMessage>?) {
+    private fun render(items: List<FamilyChatMessage>?) {
         latest.removeAllViews()
         when {
             items == null -> state.text = "Connect this device and sign in again to use Quick Updates."
-            items.isEmpty() -> state.text = "No update yet. Send the first preset above."
+            items.filter { it.messageKind == MESSAGE_KIND_QUICK }.isEmpty() -> state.text = "No quick update yet. Send the first preset above."
             else -> {
                 state.text = "Latest update • refreshes while this screen is open"
                 // Quick Updates is intentionally a status channel, not a duplicate message history.
-                latest.addView(messageCard(items.maxByOrNull { it.createdAt } ?: return))
+                latest.addView(messageCard(items.filter { it.messageKind == MESSAGE_KIND_QUICK }.maxByOrNull { it.createdAt } ?: return))
             }
         }
     }
 
-    private fun messageCard(message: FamilyMessage) = LinearLayout(this).apply {
+    private fun messageCard(message: FamilyChatMessage) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         val mine = (isParent && message.senderRole == "parent") || (!isParent && message.senderRole == "child")
         setPadding(dp(14), dp(12), dp(14), dp(12)); background = NoirUi.rounded(this@QuickMessagesActivity, if (mine) NoirUi.SURFACE_RAISED else NoirUi.SURFACE, if (mine) NoirUi.GOLD_DIM else NoirUi.SURFACE_RAISED, 16)
@@ -122,6 +122,7 @@ class QuickMessagesActivity : android.app.Activity() {
     private data class QuickTemplate(val key: String, val body: String)
 
     companion object {
+        private const val MESSAGE_KIND_QUICK = "quick_update"
         private const val EXTRA_PARENT = "parent_mode"
         private const val EXTRA_DEVICE_ID = "device_id"
         private const val EXTRA_DEVICE_NAME = "device_name"
