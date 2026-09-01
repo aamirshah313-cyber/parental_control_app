@@ -15,9 +15,13 @@ This repository has had substantial feature work, but reports from real use show
 | Emulator end-to-end test | Blocked: no installed Android system image |
 | New test-account creation | Blocked during last attempt by Supabase email rate limiting |
 | Supabase schema/function inspection | Performed read-only; relevant tables/functions exist |
-| Chat/inbox synchronization | **Unverified and reported broken by user** |
+| Chat/inbox synchronization | **Unverified and reported broken by user.** Root-caused 2026-08-31 from live Supabase data and code review; two fixes applied (one live on Supabase, one in `ParentModeActivity.kt`, unbuilt). Still not device-confirmed — see `docs/TEST_RECORD_2026-08-31.md`. |
 
 Never convert a blocked or unverified item to “working” without recorded two-device evidence.
+
+See [`docs/TEST_RECORD_2026-08-31.md`](TEST_RECORD_2026-08-31.md) for the full P01–P17 pass,
+including the exact root causes found for P08/P09/P10/P12 and why every other row remains
+BLOCKED (that pass ran in a container with no adb, no emulator, and no Android SDK).
 
 ## Security and data handling
 
@@ -89,6 +93,11 @@ Until then, apply SQL manually, in this exact order, only after checking whether
 12. `supabase/migrations/20260829_harden_command_receipts.sql`
 13. `supabase/migrations/20260830_family_notifications.sql`
 14. `supabase/migrations/20260830_harden_family_delivery.sql`
+15. `supabase/migrations/20260831_fix_family_delivery_scope_drift.sql` — closes a real bug in
+    steps 5 and 13 above: an unqualified `family_id` inside an `exists (select ... from devices
+    d ...)` subquery resolves to `devices.family_id`, not the policy's own row, on four policies.
+    Already applied to the current target project (`sbotscvpncsdctixyknu`) and verified against
+    `pg_policies`; re-running it elsewhere is idempotent (`drop policy if exists` + recreate).
 
 The first three Edge Functions were previously deployed. Verify their deployed versions and logs before redeploying; configuration and secrets must remain in Supabase, not source control.
 
