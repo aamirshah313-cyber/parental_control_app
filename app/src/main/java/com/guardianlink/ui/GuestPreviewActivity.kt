@@ -105,27 +105,30 @@ class GuestPreviewActivity : android.app.Activity() {
         content.addView(secondary("Back to Family") { showFamily() })
     }
 
-    private fun showMessage(text: String) { android.app.AlertDialog.Builder(this).setMessage(text).setPositiveButton("OK", null).show() }
+    private fun showMessage(text: String) { NoirUi.dialogBuilder(this).setMessage(text).setPositiveButton("OK", null).show() }
     private fun eyebrow(text: String) = TextView(this).apply { this.text = text; textSize = 12f; letterSpacing = .12f; typeface = Typeface.DEFAULT_BOLD; setTextColor(BLUE) }
     private fun title(text: String) = TextView(this).apply { this.text = text; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(6), 0, dp(8)) }
     private fun section(text: String) = TextView(this).apply { this.text = text; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(NAVY); setPadding(0, dp(18), 0, dp(6)) }
-    private fun note(text: String) = TextView(this).apply { this.text = text; textSize = 14f; setTextColor(MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(0xFF23242C.toInt(), BORDER); layoutParams = margins(0, 8) }
-    private fun primary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(BACKGROUND); background = interactive(BLUE, 0xFF7D6A3B.toInt(), 0xFF7D6A3B.toInt()); setOnClickListener { action() }; layoutParams = margins(12, 0) }
-    private fun secondary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(NAVY); background = interactive(0xFF23242C.toInt(), 0xFF2B2D36.toInt(), BORDER); setOnClickListener { action() }; layoutParams = margins(8, 0) }
+    private fun note(text: String) = TextView(this).apply { this.text = text; textSize = 14f; setTextColor(MUTED); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(SURFACE, BORDER); layoutParams = margins(0, 8) }
+    private fun primary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(BACKGROUND); background = interactive(BLUE, GOLD_DIM, GOLD_DIM); setOnClickListener { action() }; layoutParams = margins(12, 0) }
+    private fun secondary(text: String, action: () -> Unit) = Button(this).apply { this.text = text; isAllCaps = false; setTextColor(NAVY); background = interactive(SURFACE, SURFACE_RAISED, BORDER); setOnClickListener { action() }; layoutParams = margins(8, 0) }
     private fun navRow(first: Pair<String, () -> Unit>, second: Pair<String, () -> Unit>) = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = margins(4, 0); addView(secondary(first.first, first.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(0, 0, dp(4), 0) }); addView(secondary(second.first, second.second), LinearLayout.LayoutParams(0, dp(48), 1f).apply { setMargins(dp(4), 0, 0, 0) }) }
     private fun margins(top: Int, bottom: Int) = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(top), 0, dp(bottom)) }
     private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply { setColor(fill); cornerRadius = dp(16).toFloat(); setStroke(dp(1), stroke) }
     private fun interactive(normal: Int, active: Int, stroke: Int) = android.graphics.drawable.StateListDrawable().apply {
-        addState(intArrayOf(android.R.attr.state_pressed), rounded(0xFF7D6A3B.toInt(), BLUE))
+        addState(intArrayOf(android.R.attr.state_pressed), rounded(GOLD_DIM, BLUE))
         addState(intArrayOf(android.R.attr.state_hovered), rounded(active, BLUE))
         addState(intArrayOf(), rounded(normal, stroke))
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private companion object {
         val BACKGROUND get() = NoirUi.BACKGROUND
+        val SURFACE get() = NoirUi.SURFACE
+        val SURFACE_RAISED get() = NoirUi.SURFACE_RAISED
         val NAVY get() = NoirUi.TEXT
         val MUTED get() = NoirUi.MUTED
         val BLUE get() = NoirUi.GOLD
+        val GOLD_DIM get() = NoirUi.GOLD_DIM
         val BORDER get() = NoirUi.SURFACE_RAISED
     }
 }

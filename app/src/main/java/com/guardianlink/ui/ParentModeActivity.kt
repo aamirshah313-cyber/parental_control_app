@@ -2,7 +2,6 @@ package com.guardianlink.ui
 
 import android.os.Bundle
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.text.InputType
@@ -121,7 +120,7 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun showPrivacyNotice() {
-        android.app.AlertDialog.Builder(this)
+        NoirUi.dialogBuilder(this)
             .setTitle("Privacy and child-data notice")
             .setMessage(
                 "This app is for parents or legal guardians supervising a child device with appropriate notice and consent. " +
@@ -140,7 +139,7 @@ class ParentModeActivity : android.app.Activity() {
         val durations = listOf("10 minutes" to 600, "30 minutes" to 1_800, "1 hour" to 3_600, "24 hours" to 86_400)
         val durationPicker = Spinner(this).apply { adapter = ArrayAdapter(this@ParentModeActivity, android.R.layout.simple_spinner_dropdown_item, durations.map { it.first }) }
         val output = TextView(this).apply {
-            text = lastPairingMessage.orEmpty(); textSize = 14f; setTextColor(Color.rgb(17, 80, 130)); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(Color.rgb(232, 242, 255), Color.rgb(171, 204, 244))
+            text = lastPairingMessage.orEmpty(); textSize = 14f; setTextColor(NoirUi.TEXT); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(NoirUi.SURFACE_RAISED, NoirUi.GOLD_DIM)
         }
         val copy = button("Copy pairing code") {
             val code = lastPairingCode
@@ -156,7 +155,7 @@ class ParentModeActivity : android.app.Activity() {
         dialogContent.addView(button("Generate one-time code") { createPairing(childName.text.toString(), durations[durationPicker.selectedItemPosition].second, output, copy) })
         dialogContent.addView(output)
         dialogContent.addView(copy)
-        android.app.AlertDialog.Builder(this)
+        NoirUi.dialogBuilder(this)
             .setTitle("Pair a child device")
             .setView(dialogContent)
             .setNegativeButton("Close", null)
@@ -172,7 +171,7 @@ class ParentModeActivity : android.app.Activity() {
             setOnCheckedChangeListener { _, enabled -> setParentAlertsEnabled(enabled) }
         })
         dialogContent.addView(secondaryButton("Stop current SOS sound") { SosAlertService.stopAlarm(this); setStatus("SOS sound stopped. Alert monitoring remains active.") })
-        android.app.AlertDialog.Builder(this)
+        NoirUi.dialogBuilder(this)
             .setTitle("Parent alerts")
             .setView(dialogContent)
             .setNegativeButton("Close", null)
@@ -612,7 +611,7 @@ class ParentModeActivity : android.app.Activity() {
     }
 
     private fun confirmRetire(device: DeviceRecord) {
-        android.app.AlertDialog.Builder(this)
+        NoirUi.dialogBuilder(this)
             .setTitle("Retire ${device.displayName}?")
             .setMessage("It will disappear from this dashboard. This does not erase stored safety records and cannot be undone from the app.")
             .setNegativeButton("Cancel", null)
