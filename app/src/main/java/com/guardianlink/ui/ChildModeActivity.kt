@@ -148,7 +148,7 @@ class ChildModeActivity : android.app.Activity() {
             hint = "Paste new one-time pairing code"; setSingleLine(); setTextColor(NoirUi.TEXT); setHintTextColor(NoirUi.MUTED)
             background = NoirUi.rounded(this@ChildModeActivity, NoirUi.SURFACE_RAISED, NoirUi.SURFACE_RAISED, 14); setPadding(dp(14), dp(4), dp(14), dp(4))
         }
-        android.app.AlertDialog.Builder(this)
+        NoirUi.dialogBuilder(this)
             .setTitle("Re-pair this device?")
             .setMessage("Ask the parent to retire the old child entry first, then create a new code. A successful new code replaces this phone’s local pairing.")
             .setView(code)
@@ -264,7 +264,7 @@ class ChildModeActivity : android.app.Activity() {
             return
         }
         val options = intArrayOf(15, 30, 45, 60)
-        android.app.AlertDialog.Builder(this).setTitle("Ask for extra time").setMessage("Choose the extra screen time you need today. Your parent decides whether to grant it.")
+        NoirUi.dialogBuilder(this).setTitle("Ask for extra time").setMessage("Choose the extra screen time you need today. Your parent decides whether to grant it.")
             .setItems(options.map { "$it minutes" }.toTypedArray()) { _, which ->
                 showStatus("Sending time request…")
                 Thread { val sent = session.api()?.requestMoreScreenTime(options[which]) == true; runOnUiThread { showStatus(if (sent) "Request sent. Sync after your parent responds." else "Could not send request. Check the connection and the professional-controls migration.") } }.start()

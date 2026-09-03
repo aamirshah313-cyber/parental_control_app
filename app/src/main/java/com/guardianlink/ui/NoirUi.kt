@@ -31,6 +31,18 @@ object NoirUi {
         return dark
     }
 
+    /**
+     * The app theme is forced to Theme.Material.Light (see themes.xml), so a plain
+     * AlertDialog.Builder always renders as a light system dialog even in dark mode --
+     * mismatched against every custom NoirUi-drawn screen, and unreadable for any
+     * NoirUi.TEXT-colored widget placed inside one. Use this everywhere instead so dialogs
+     * follow the same dark/light state as the rest of the app.
+     */
+    fun dialogBuilder(context: Context) = android.app.AlertDialog.Builder(
+        context,
+        if (isDark(context)) android.R.style.Theme_Material_Dialog else android.R.style.Theme_Material_Light_Dialog
+    )
+
     fun dp(context: Context, value: Int) = (value * context.resources.displayMetrics.density).toInt()
     fun rounded(context: Context, fill: Int = SURFACE, stroke: Int = SURFACE_RAISED, radius: Int = 20) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(context, radius).toFloat(); setStroke(dp(context, 1), stroke)

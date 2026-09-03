@@ -162,3 +162,78 @@ Build `app-debug.apk` from this commit on the documented setup, install on two d
 distinct authenticated identities (fresh parent + fresh child pairing), and run P08/P09/P10/P12
 end-to-end per the acceptance-matrix evidence requirements (sender action, Supabase row, receiver
 query, receiver UI, logcat). Only record them "PASS" here once that evidence exists.
+
+## Follow-up pass, 2026-09-01: design coherence and a voice-message RLS bug
+
+The user reported design mismatches between pages, text made unreadable by font-color choices,
+and asked to confirm audio messages actually work. Code review (still no device access in this
+container) found these root causes:
+
+**AlertDialogs never followed the app's dark/light state.** `AndroidManifest.xml` fixes the app
+theme to `Theme.Material.Light.NoActionBar` — that's the base Activity theme, not NoirUi's
+adaptive dark/light state, and a plain `android.app.AlertDialog.Builder(this)` inherits it
+regardless of what NoirUi is currently rendering. Every popup (pairing dialog, parent-alerts
+dialog, privacy notice, retire-device confirm, child re-pair confirm, child extra-time request,
+guest-mode message boxes — 7 call sites total) was therefore always a plain light system dialog,
+mismatched against a dark NoirUi screen behind it. Worse, `ParentModeActivity.showAlertControls()`
+put a `Switch` colored with `NoirUi.TEXT` (light cream in dark mode) directly on that dialog with
+no background box of its own — genuinely unreadable, near-invisible text, in dark mode. Fixed
+with `NoirUi.dialogBuilder(context)` (`NoirUi.kt`), which builds an `AlertDialog.Builder` themed
+`android.R.style.Theme_Material_Dialog` or `Theme_Material_Light_Dialog` to match
+`NoirUi.isDark()`, and swapped in at all 7 call sites (`ParentModeActivity.kt`,
+`ChildModeActivity.kt`, `GuestPreviewActivity.kt`).
+
+**Two screens had colors hardcoded to only their dark-mode values.** `GuestPreviewActivity.kt`
+(`note()`, `primary()`/`secondary()` pressed/hover states) and `LocationLogActivity.kt`
+(`locationCard()`, `messageCard()`) painted card backgrounds and button interactive states with
+literal hex (`0xFF23242C`, `0xFF7D6A3B`, `0xFF2B2D36` — NoirUi's dark-mode SURFACE/GOLD_DIM/
+SURFACE_RAISED values, copy-pasted instead of referencing the adaptive getters). In light mode
+these rendered as dark boxes sitting in an otherwise light screen — the literal "mismatch"
+reported — and in `GuestPreviewActivity.note()` specifically, `MUTED` text (mid-gray, meant for a
+light surface) landed on a near-black box, close to unreadable. Fixed by replacing every literal
+with the matching adaptive `NoirUi.*` getter (added `SURFACE`/`SURFACE_RAISED`/`GOLD_DIM` aliases
+alongside each file's existing `BACKGROUND`/`NAVY`/`MUTED`/`BLUE`/`BORDER` ones).
+
+`ParentModeActivity.showPairingDialog()`'s pairing-code output box also used an unrelated
+hardcoded light-blue palette (`Color.rgb(17, 80, 130)` text on `Color.rgb(232, 242, 255)`) that
+never adapted and didn't match the app's graphite/gold language either. Switched to
+`NoirUi.TEXT` on `rounded(NoirUi.SURFACE_RAISED, NoirUi.GOLD_DIM)`.
+
+`SosAlertActivity` (the full-screen SOS alarm) was deliberately left untouched: it uses its own
+hardcoded high-contrast red/white palette instead of NoirUi, which is intentional — an emergency
+alarm screen should look alarming and distinct, not blend into the graphite/gold everyday theme.
+Its own contrast (white/light-pink text on red) is fine on inspection.
+
+**Chat message sequencing:** re-checked `SupabaseApi.chatMessages()` / `ParentApi.chatMessages()`
+and `FamilyChatActivity.render()`. Both sides already query the same `family_chat_messages` rows
+by `device_id` only (not filtered by `sender_role`), order ascending by `created_at`, and fully
+replace the rendered list on every load — so parent and child messages already interleave in one
+chronological thread on both screens by design. No code defect found here; if this still doesn't
+hold once tested on two devices, it's most likely a symptom of the P08/P09 device-selection bug
+already fixed (a stale `device_id` splits the conversation across two device rows, which would
+look like "not in sequence" — actually two different threads).
+
+**Voice messages: a real, confirmed RLS bug, not a missing library.** The `guardian-voice`
+storage bucket, its RLS policies, `RECORD_AUDIO` in the manifest, and the record/upload/play code
+in `SupabaseApi`/`ParentApi`/`FamilyChatActivity` were all already present and correct-looking —
+but live inspection of `storage.objects` policies on the target Supabase project showed the two
+**parent-side** policies (`Parents read guardian voice`, `Parents upload guardian voice`) had
+silently resolved `(storage.foldername(name))[1]` to `families.name` (the family's display
+name) instead of `storage.objects.name` (the uploaded file's path) — the identical class of
+Postgres subquery-scoping bug already fixed for `family_messages`/`family_notifications` in
+`20260831_fix_family_delivery_scope_drift.sql`, this time baked into
+`20260829_family_chat_voice.sql` since it was first written. A family's display name never
+matches a device UUID, so these two policies always evaluated false: **a parent could never
+read or upload a voice note**, while the child-side policies (whose subquery only touches
+`devices`, which has no `name` column to shadow the reference) worked correctly the whole time.
+This is very likely what read as "the audio button isn't there" — a parent's recording would
+fail to upload, so no chat row (and therefore no ▶ Play voice note button) was ever created.
+
+Fixed and verified live: `supabase/migrations/20260901_fix_guardian_voice_parent_policies.sql`,
+applied to `sbotscvpncsdctixyknu` via `apply_migration`. Re-queried `pg_policies` afterward — both
+policies now read `(storage.foldername(objects.name))[1]`, correctly qualified.
+
+None of this needed a new library or SDK module — `MediaRecorder`/`MediaPlayer`/`RECORD_AUDIO`
+were already correctly wired; the failure was purely the backend policy. As with the other RLS
+fixes in this file, this is backend-verified, not two-device-confirmed — record a real P11 pass
+once you can install and test on two devices.
