@@ -25,7 +25,8 @@ data class ReportedApp(val packageName: String, val displayName: String, val pen
 data class AppInstallRequest(val id: String, val deviceId: String, val appName: String, val packageName: String, val createdAt: String)
 data class FamilyMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
 data class TimeRequest(val id: String, val deviceId: String, val requestedMinutes: Int, val createdAt: String)
-data class DeviceHealth(val batteryPercent: Int?, val protectionActive: Boolean, val usageAccessAvailable: Boolean, val screenMinutesToday: Int, val reportedAt: String, val appliedPolicyVersion: Int? = null)
+data class DeviceHealth(val batteryPercent: Int?, val protectionActive: Boolean, val usageAccessAvailable: Boolean, val screenMinutesToday: Int, val reportedAt: String, val appliedPolicyVersion: Int? = null, val locationStatus: String? = null)
+data class AppActionRequest(val id: String, val deviceId: String, val appName: String, val packageName: String, val action: String, val status: String, val requestedAt: String, val expiresAt: String, val decidedAt: String?)
 data class FamilyChatMessage(val id: String, val senderRole: String, val body: String, val audioPath: String?, val createdAt: String, val messageKind: String = "chat", val templateKey: String? = null)
 data class PauseState(val active: Boolean, val scope: String = "managed_apps", val expiresAtEpochMs: Long? = null)
 
@@ -124,11 +125,29 @@ class ParentApi(private val session: ParentSession) {
     /** Uses a server-side ownership check because child sessions may update only last_seen_at. */
     fun retireDevice(deviceId: String): Boolean = function("retire-device", JSONObject().put("device_id", deviceId))?.optBoolean("retired", false) == true
 
-    fun deviceHealth(deviceId: String): DeviceHealth? = (get("/rest/v1/device_health?device_id=eq.$deviceId&select=battery_percent,protection_active,usage_access_available,screen_minutes_today,reported_at,applied_policy_version&order=reported_at.desc&limit=1")
+    fun deviceHealth(deviceId: String): DeviceHealth? = (get("/rest/v1/device_health?device_id=eq.$deviceId&select=battery_percent,protection_active,usage_access_available,screen_minutes_today,reported_at,applied_policy_version,location_status&order=reported_at.desc&limit=1")
+        ?: get("/rest/v1/device_health?device_id=eq.$deviceId&select=battery_percent,protection_active,usage_access_available,screen_minutes_today,reported_at,applied_policy_version&order=reported_at.desc&limit=1")
         ?: get("/rest/v1/device_health?device_id=eq.$deviceId&select=battery_percent,protection_active,usage_access_available,screen_minutes_today,reported_at&order=reported_at.desc&limit=1"))
         ?.takeIf { it.length() > 0 }?.getJSONObject(0)?.let { row ->
-            DeviceHealth(row.optInt("battery_percent", -1).takeIf { it >= 0 }, row.optBoolean("protection_active"), row.optBoolean("usage_access_available"), row.optInt("screen_minutes_today", 0), row.getString("reported_at"), row.optInt("applied_policy_version", -1).takeIf { it >= 0 })
+            DeviceHealth(row.optInt("battery_percent", -1).takeIf { it >= 0 }, row.optBoolean("protection_active"), row.optBoolean("usage_access_available"), row.optInt("screen_minutes_today", 0), row.getString("reported_at"), row.optInt("applied_policy_version", -1).takeIf { it >= 0 }, row.optString("location_status").ifBlank { null })
         }
+
+    /** Pending requests first (oldest first, so the oldest wait is handled first), then decided history newest first. */
+    fun familyAppActionRequests(familyId: String): List<AppActionRequest> = get("/rest/v1/app_action_requests?family_id=eq.$familyId&select=id,device_id,app_name,package_name,action,status,requested_at,expires_at,decided_at&order=requested_at.desc&limit=200")?.let { rows ->
+        (0 until rows.length()).map { appActionRequestRecord(rows.getJSONObject(it)) }
+    } ?: emptyList()
+
+    /** The decision-only trigger on app_action_requests rejects any change once status leaves 'pending'. */
+    fun decideAppActionRequest(requestId: String, approve: Boolean): Boolean = patch("/rest/v1/app_action_requests?id=eq.$requestId", JSONObject().apply {
+        put("status", if (approve) "approved" else "denied"); put("decided_at", java.time.Instant.now().toString()); put("decided_by", session.userId)
+    })
+
+    fun sendAppActionDecision(familyId: String, deviceId: String, appName: String, action: String, approved: Boolean): Boolean = post("/rest/v1/family_notifications", JSONObject().apply {
+        put("family_id", familyId); put("device_id", deviceId); put("target_role", "child")
+        put("title", if (approved) "Request approved" else "Request declined")
+        put("body", "Your parent ${if (approved) "approved" else "declined"} the request to $action $appName.")
+        put("event_type", "app_request")
+    }) != null
 
     fun pendingTimeRequests(deviceId: String): List<TimeRequest> = get("/rest/v1/child_time_requests?device_id=eq.$deviceId&status=eq.pending&select=id,device_id,requested_minutes,created_at&order=created_at.asc")?.let { rows ->
         (0 until rows.length()).map { index -> rows.getJSONObject(index).let { TimeRequest(it.getString("id"), it.getString("device_id"), it.getInt("requested_minutes"), it.getString("created_at")) } }
@@ -289,6 +308,7 @@ class ParentApi(private val session: ParentSession) {
     private fun messageRecord(row: JSONObject) = FamilyMessage(row.getString("id"), row.getString("sender_role"), row.getString("template_key"), row.getString("body"), row.getString("created_at"))
     private fun chatRecord(row: JSONObject) = FamilyChatMessage(row.getString("id"), row.getString("sender_role"), row.optString("body"), row.optString("audio_path").ifBlank { null }, row.getString("created_at"), row.optString("message_kind", "chat"), row.optString("template_key").ifBlank { null })
     private fun notificationRecord(row: JSONObject) = FamilyNotification(row.getString("id"), row.getString("device_id"), row.getString("title"), row.getString("body"), row.getString("event_type"), row.getString("created_at"), row.optString("read_at").ifBlank { null })
+    private fun appActionRequestRecord(row: JSONObject) = AppActionRequest(row.getString("id"), row.getString("device_id"), row.getString("app_name"), row.getString("package_name"), row.getString("action"), row.getString("status"), row.getString("requested_at"), row.getString("expires_at"), row.optString("decided_at").ifBlank { null })
     private fun postNotification(familyId: String, deviceId: String, targetRole: String, title: String, body: String, eventType: String): Boolean = post("/rest/v1/family_notifications", JSONObject().apply {
         put("family_id", familyId); put("device_id", deviceId); put("target_role", targetRole); put("title", title); put("body", body); put("event_type", eventType)
     }) != null

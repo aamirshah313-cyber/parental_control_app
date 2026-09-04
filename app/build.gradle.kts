@@ -42,3 +42,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    // JVM unit tests only (app/src/test) -- no Android framework, no device/emulator needed.
+    testImplementation("junit:junit:4.13.2")
+}

@@ -13,6 +13,7 @@ data class ReportedAppPayload(val packageName: String, val displayName: String, 
 data class ChildQuickMessage(val id: String, val senderRole: String, val templateKey: String, val body: String, val createdAt: String)
 data class ChildFamilyChatMessage(val id: String, val senderRole: String, val body: String, val audioPath: String?, val createdAt: String, val messageKind: String = "chat", val templateKey: String? = null)
 data class FamilyNotification(val id: String, val deviceId: String, val title: String, val body: String, val eventType: String, val createdAt: String, val readAt: String? = null)
+data class ChildAppActionRequest(val id: String, val appName: String, val packageName: String, val action: String, val status: String, val requestedAt: String, val expiresAt: String, val decidedAt: String?)
 
 /** Small dependency-free REST client. The app uses its public anon key plus the child device JWT. */
 class SupabaseApi(private val deviceId: String, private val accessToken: String) {
@@ -191,6 +192,43 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         }
     }
 
+    /** Parent approval is required before Guardian Link's own soft-block on this app is lifted;
+     * the app itself never claims to install, hide, or disable a package at the OS level. */
+    fun requestAppAction(appName: String, packageName: String, action: String): Boolean {
+        if (!enabled || action !in setOf("install", "unblock", "enable")) return false
+        val familyRows = get("/rest/v1/devices?id=eq.$deviceId&select=family_id") ?: return false
+        if (familyRows.length() == 0) return false
+        val familyId = familyRows.getJSONObject(0).getString("family_id")
+        val sent = request("POST", "/rest/v1/app_action_requests", JSONObject().apply {
+            put("family_id", familyId); put("device_id", deviceId); put("app_name", appName); put("package_name", packageName); put("action", action)
+        }.toString()) != null
+        if (sent) postNotification(familyId, "parent", "App $action request", "$appName is waiting for your approval to $action.", "app_request")
+        return sent
+    }
+
+    /** The child's own reported-app inventory, reusing ParentApi's ReportedApp shape (same package, no need to duplicate it). */
+    fun reportedApps(): List<ReportedApp> {
+        if (!enabled) return emptyList()
+        val rows = get("/rest/v1/device_apps?device_id=eq.$deviceId&select=package_name,display_name,pending_approval,last_reported_at&order=display_name.asc") ?: return emptyList()
+        return (0 until rows.length()).map { index ->
+            rows.getJSONObject(index).let { ReportedApp(it.getString("package_name"), it.getString("display_name"), it.optBoolean("pending_approval", false), it.getString("last_reported_at")) }
+        }
+    }
+
+    fun appActionRequests(): List<ChildAppActionRequest> {
+        if (!enabled) return emptyList()
+        val rows = get("/rest/v1/app_action_requests?device_id=eq.$deviceId&select=id,app_name,package_name,action,status,requested_at,expires_at,decided_at&order=requested_at.desc&limit=50") ?: return emptyList()
+        return (0 until rows.length()).map { appActionRequestRecord(rows.getJSONObject(it)) }
+    }
+
+    /** A device_health row may not exist yet; merge-duplicates upserts one using column defaults for the rest. */
+    fun updateLocationStatus(status: String): Boolean {
+        if (!enabled) return false
+        return request("POST", "/rest/v1/device_health?on_conflict=device_id", JSONObject().apply {
+            put("device_id", deviceId); put("location_status", status); put("reported_at", java.time.Instant.now().toString())
+        }.toString(), "resolution=merge-duplicates,return=minimal") != null
+    }
+
     fun upsertReportedApps(apps: List<ReportedAppPayload>): Boolean {
         if (!enabled || apps.isEmpty()) return false
         val body = JSONArray().apply { apps.forEach { app -> put(JSONObject().apply {
@@ -219,6 +257,7 @@ class SupabaseApi(private val deviceId: String, private val accessToken: String)
         ?: get("/rest/v1/family_chat_messages?device_id=eq.$deviceId&select=id,sender_role,body,audio_path,created_at&order=created_at.desc&limit=80")
     private fun childChatRecord(row: JSONObject) = ChildFamilyChatMessage(row.getString("id"), row.getString("sender_role"), row.optString("body"), row.optString("audio_path").ifBlank { null }, row.getString("created_at"), row.optString("message_kind", "chat"), row.optString("template_key").ifBlank { null })
     private fun notificationRecord(row: JSONObject) = FamilyNotification(row.getString("id"), row.getString("device_id"), row.getString("title"), row.getString("body"), row.getString("event_type"), row.getString("created_at"), row.optString("read_at").ifBlank { null })
+    private fun appActionRequestRecord(row: JSONObject) = ChildAppActionRequest(row.getString("id"), row.getString("app_name"), row.getString("package_name"), row.getString("action"), row.getString("status"), row.getString("requested_at"), row.getString("expires_at"), row.optString("decided_at").ifBlank { null })
     private fun postNotification(familyId: String, targetRole: String, title: String, body: String, eventType: String): Boolean = request("POST", "/rest/v1/family_notifications", JSONObject().apply {
         put("family_id", familyId); put("device_id", deviceId); put("target_role", targetRole); put("title", title); put("body", body); put("event_type", eventType)
     }.toString()) != null

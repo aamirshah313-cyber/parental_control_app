@@ -21,6 +21,9 @@ object NoirUi {
     val TEXT get() = if (darkMode) 0xFFF5F2EA.toInt() else 0xFF202128.toInt()
     val MUTED get() = if (darkMode) 0xFFAFAFBA.toInt() else 0xFF62646C.toInt()
     val DANGER get() = if (darkMode) 0xFFC76870.toInt() else 0xFFB53643.toInt()
+    /** The mode set by the last apply()/isDark(context) call, for callers building a screen-local
+     * color that needs to branch on dark/light without holding a Context at property-init time. */
+    val isDarkCached get() = darkMode
 
     fun apply(context: Context) { darkMode = AppTheme.isDark(context) }
     fun isDark(context: Context): Boolean { apply(context); return darkMode }

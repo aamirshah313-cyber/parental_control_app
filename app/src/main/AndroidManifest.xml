@@ -29,6 +29,8 @@
         <activity android:name=".ui.TimeRequestsActivity" android:exported="false" />
         <activity android:name=".ui.LocationLogActivity" android:exported="false" />
         <activity android:name=".ui.QuickMessagesActivity" android:exported="false" />
+        <activity android:name=".ui.ApprovalRequestsActivity" android:exported="false" />
+        <activity android:name=".ui.ChildAppRequestsActivity" android:exported="false" />
         <activity android:name=".ui.FamilyChatActivity" android:exported="false" />
         <activity android:name=".ui.NotificationsActivity" android:exported="false" />
         <activity android:name=".ui.GuardianGuideActivity" android:exported="false" />

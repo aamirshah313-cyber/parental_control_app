@@ -129,6 +129,7 @@ class ChildModeActivity : android.app.Activity() {
         content.addView(note("Quick updates show only the latest preset message. Use Family Chat for a full typed or voice-note conversation."))
         content.addView(NoirUi.secondaryButton(this, "Notifications") { startActivity(NotificationsActivity.childIntent(this)) }.apply { layoutParams = margins(6) })
         content.addView(NoirUi.secondaryButton(this, "Ask parent for extra time") { requestMoreTime() }.apply { layoutParams = margins(6) })
+        content.addView(NoirUi.secondaryButton(this, "Ask to install, unblock, or enable an app") { startActivity(ChildAppRequestsActivity.intent(this)) }.apply { layoutParams = margins(6) })
     }
 
     private fun buildHelp() {

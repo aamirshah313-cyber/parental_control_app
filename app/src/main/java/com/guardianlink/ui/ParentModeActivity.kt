@@ -304,6 +304,7 @@ class ParentModeActivity : android.app.Activity() {
                 "Family chat" to { family?.let { startActivity(FamilyChatActivity.parentIntent(this, it.id, device.id, device.displayName)) } }
             ))
             content.addView(secondaryButton("Notifications") { family?.let { startActivity(NotificationsActivity.parentIntent(this, it.id, device.id, device.displayName)) } })
+            content.addView(secondaryButton("Approval requests") { family?.let { startActivity(ApprovalRequestsActivity.intent(this, it.id)) } }.apply { layoutParams = layoutParams(8, 0) })
         }
         content.addView(section("Help & guide"))
         content.addView(actionRow(

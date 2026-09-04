@@ -56,18 +56,34 @@ class LiveLocationActivity : android.app.Activity() {
         val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: return
         details.text = "Loading latest check-in…"
         Thread {
-            val location = ParentApi(ParentSessionStore(this).ensureFresh() ?: session).latestLocation(deviceId)
+            val api = ParentApi(ParentSessionStore(this).ensureFresh() ?: session)
+            val location = api.latestLocation(deviceId)
+            val health = api.deviceHealth(deviceId)
             runOnUiThread {
-                if (location == null) {
-                    details.text = "No shared location yet. Enable location sharing on the child phone and start its visible location service."
+                if (location != null) {
+                    latestLatitude = location.latitude
+                    latestLongitude = location.longitude
+                    details.text = String.format(Locale.US, "Location available\n%.5f, %.5f • ±%s • %s", location.latitude, location.longitude, location.accuracyMeters?.let { "${it.toInt()} m" } ?: "unknown", location.recordedAt)
+                    mapPrompt.text = "Google Maps ready\nTap “Open in Google Maps” to view ${String.format(Locale.US, "%.5f, %.5f", location.latitude, location.longitude)} and start navigation."
                     return@runOnUiThread
                 }
-                latestLatitude = location.latitude
-                latestLongitude = location.longitude
-                details.text = String.format(Locale.US, "%.5f, %.5f • ±%s • %s", location.latitude, location.longitude, location.accuracyMeters?.let { "${it.toInt()} m" } ?: "unknown", location.recordedAt)
-                mapPrompt.text = "Google Maps ready\nTap “Open in Google Maps” to view ${String.format(Locale.US, "%.5f, %.5f", location.latitude, location.longitude)} and start navigation."
+                latestLatitude = null; latestLongitude = null
+                details.text = when {
+                    health?.locationStatus == "permission_denied" -> "Permission denied\nThe child device has not granted Guardian Link location access. Ask them to allow location permission, then Sync rules."
+                    health?.locationStatus == "services_disabled" -> "Location services disabled\nGPS/location services are turned off on the child phone. Ask them to enable location services."
+                    health?.locationStatus == "waiting" -> "Waiting for location\nSharing is active and Guardian Link is waiting for the first GPS fix. This can take a minute outdoors."
+                    isStale(health?.reportedAt) -> "Device offline\nThe child phone has not checked in recently. The most recent known location, if any, is shown in the location log."
+                    else -> "Location unavailable\nEnable location sharing on the child phone and start its visible location service."
+                }
+                mapPrompt.text = "Google Maps\nOpen the latest coordinate in Google Maps for directions, navigation, and the full map view."
             }
         }.start()
+    }
+
+    /** No recent health check-in at all is treated the same as a known-stale one: both mean "not currently reachable". */
+    private fun isStale(reportedAt: String?): Boolean {
+        val instant = reportedAt?.let { runCatching { java.time.Instant.parse(it) }.getOrNull() } ?: return false
+        return java.time.Duration.between(instant, java.time.Instant.now()).toMinutes() > STALE_MINUTES
     }
 
     private fun openExternalMap(latitude: Double, longitude: Double) {
@@ -84,6 +100,7 @@ class LiveLocationActivity : android.app.Activity() {
     companion object {
         private const val EXTRA_DEVICE_ID = "device_id"
         private const val EXTRA_DEVICE_NAME = "device_name"
+        private const val STALE_MINUTES = 30L
         fun intent(context: android.content.Context, deviceId: String, deviceName: String) =
             Intent(context, LiveLocationActivity::class.java).putExtra(EXTRA_DEVICE_ID, deviceId).putExtra(EXTRA_DEVICE_NAME, deviceName)
     }

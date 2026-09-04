@@ -30,7 +30,7 @@ class LocationService : Service(), LocationListener {
             .setContentText("Location is shared with the parent family when enabled by policy")
             .setOngoing(true)
             .build())
-        if (!hasLocationPermission()) { stopSelf(); return }
+        if (!hasLocationPermission()) { reportStatus("permission_denied"); stopSelf(); return }
         locationManager = getSystemService(LocationManager::class.java)
         requestUpdates()
     }
@@ -42,13 +42,23 @@ class LocationService : Service(), LocationListener {
         val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { provider ->
             runCatching { locationManager.isProviderEnabled(provider) }.getOrDefault(false)
         }
+        if (providers.isEmpty()) { reportStatus("services_disabled"); return }
         providers.forEach { provider -> locationManager.requestLocationUpdates(provider, interval, 100f, this) }
-        providers.mapNotNull { provider -> runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() }.firstOrNull()?.let(::upload)
+        val lastKnown = providers.mapNotNull { provider -> runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() }.firstOrNull()
+        if (lastKnown != null) upload(lastKnown) else reportStatus("waiting")
     }
 
     override fun onLocationChanged(location: Location) {
         if (!store.load().locationEnabled || !getSharedPreferences("guardian_child_setup", MODE_PRIVATE).getBoolean("child_location_enabled", false)) { stopSelf(); return }
         upload(location)
+    }
+
+    /** Best-effort: a device with no connectivity cannot report its own "offline" status either,
+     * so the parent UI infers that case from staleness instead of relying on this call. */
+    private fun reportStatus(status: String) {
+        val session = DeviceSessionStore(this)
+        if (!session.isPaired()) return
+        Thread { session.api()?.updateLocationStatus(status) }.start()
     }
 
     private fun upload(location: Location) {
@@ -58,6 +68,7 @@ class LocationService : Service(), LocationListener {
             val api = session.api() ?: return@Thread
             // Do not emit a false "location updated" event or change safe-place state when the location row was rejected.
             if (!api.postLocation(location.latitude, location.longitude, location.accuracy.takeIf { location.hasAccuracy() })) return@Thread
+            api.updateLocationStatus("available")
             api.postEvent("location_update", org.json.JSONObject().apply { put("accuracy_meters", location.accuracy) })
             reportSafePlaceTransitions(location, api)
         }.start()
